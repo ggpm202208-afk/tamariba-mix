@@ -357,7 +357,7 @@ function dateKey(){
 function pad2(n){return n<10?'0'+n:''+n;}
 function topicName(){
   var base=S.channel||DEFAULT_CHANNEL;
-  return S.mode==='recruit'?(base+'-r'+dateKey()):base;
+  return S.mode==='recruit'?(base+'-r'):base;
 }
 function publish(obj){
   try{fetch(RELAY+'/'+encodeURIComponent(topicName()),{method:'POST',body:JSON.stringify(obj),cache:'no-store'}).catch(function(){});}catch(e){}
@@ -393,6 +393,11 @@ function onMsg(m,relayTs){
     refreshRecruit();return;
   }
   if(m.t==='snap'){
+    // 新しい募集が立ったら、前の回の表示は捨てる
+    if(m.sid){
+      if(S.sid&&m.sid!==S.sid){ S.rlog=[]; S.dcAlloc=null; }
+      S.sid=m.sid;
+    }
     // 文字列でも {n,a} でも壊れないように正規化する
     var avm=m.av||{};
     var nm=function(x){ return (x&&typeof x==='object') ? String(x.n||x.name||'?') : String(x==null?'?':x); };
@@ -404,7 +409,10 @@ function onMsg(m,relayTs){
     if(S.cap)S.cap=m.cap||S.cap;
     refreshRecruit();return;
   }
-  if(m.t==='alloc'){ S.dcAlloc=m; refreshRecruit(); return; }
+  if(m.t==='alloc'){
+    if(m.sid&&S.sid&&m.sid!==S.sid)return;   // 前の回の結果は表示しない
+    S.dcAlloc=m; refreshRecruit(); return;
+  }
   if(m.t==='rs'){ S.log.push({rs:true,ts:m.ts||relayTs||nowSec()}); refresh(); return; }
   if(m.t==='v'){
     if(!m.cid||(m.c!=='r'&&m.c!=='b'))return;
@@ -515,7 +523,7 @@ function renderRecruit(){
   if(S.dcCount) html+='<p class="sub" style="margin:0">Discordの✅リアクションから自動集計中</p>';
   html+='<div class="roster">'+r.list.map(function(p){
       var me=p.cid===S.cid?' mine-name':'';
-      var im=p.av?'<img src="'+esc(p.av)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':'';
+      var im=p.av?'<img src="'+esc(p.av)+'" alt="" onerror="this.style.display=\'none\'">':'';
       return '<span class="chip'+me+(p.tent?' tent':'')+'">'+im+(p.tent?'🟡 ':'')+esc(p.n)+'</span>';
     }).join('')+(r.list.length?'':'<span class="hint" style="margin:0">まだ誰もいません</span>')+'</div>';
 
@@ -532,7 +540,7 @@ function renderRecruit(){
     '<div class="lbl">募集人数</div>'+
     '<input id="capInput" type="number" min="2" max="30" value="'+cap+'">'+
     '<button class="mini" data-act="capSave">保存</button>'+
-    '<div class="lbl">合言葉（日付で自動リセットされます）</div>'+
+    '<div class="lbl">合言葉</div>'+
     '<input id="chInput" value="'+esc(S.channel)+'" spellcheck="false" autocomplete="off">'+
     '<div class="row"><button class="mini" data-act="chSave">接続</button><button class="mini" data-act="copyLink">共有リンク</button></div>'+
     '<div class="lbl">Discord ウェブフック（満員時に1回だけ送信）</div>'+
