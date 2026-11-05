@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0C0A">
+<title>MIX バランス確認</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --ink:#0A0C0A;--panel:#111511;--panel-2:#171D17;--line:#282F28;--line-2:#3A443A;
+  --bone:#EDE9DB;--dim:#8C948A;
+  --red:#E04A33;--red-soft:#F07A63;--blue:#5A8DF2;--blue-soft:#8FB2F7;--amber:#E8A63C;--green:#6FBF86;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",YuGothic,Meiryo,system-ui,sans-serif;
+}
+html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden}
+body{
+  background:
+    radial-gradient(120% 70% at 50% -18%, rgba(74,116,86,.22), transparent 62%),
+    radial-gradient(90% 55% at 105% 112%, rgba(224,74,51,.10), transparent 62%),
+    var(--ink);
+  color:var(--bone);font-family:var(--jp);-webkit-font-smoothing:antialiased;
+  min-height:100dvh;overscroll-behavior:none;
+}
+.app{width:100%;max-width:560px;margin:0 auto;padding:18px 16px calc(26px + env(safe-area-inset-bottom));min-height:100dvh;display:flex;flex-direction:column;gap:14px;overflow-x:clip}
+.mono{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim)}
+
+/* header */
+.hud{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);background:rgba(10,12,10,.72);backdrop-filter:blur(6px);position:sticky;top:6px;z-index:5}
+.hud-name{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:#C9C6B6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+.hud-state{flex:1;text-align:right;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;white-space:nowrap}
+.hud-state.on{color:#C9C6B6}
+.sig{width:6px;height:6px;border-radius:50%;background:#3D4A3D;flex:none}
+.sig.live{background:var(--green);box-shadow:0 0 8px rgba(111,191,134,.9)}
+
+.stage{display:flex;flex-direction:column;gap:13px;flex:1;min-width:0}
+
+/* question */
+.q.sub-q{font-size:clamp(20px,5.6vw,24px);letter-spacing:-.02em;margin-top:2px}
+.q{font-size:clamp(32px,9.6vw,42px);font-weight:900;letter-spacing:-.04em;line-height:1.02;margin:6px 0 0}
+.q small{display:block;font-size:11px;font-weight:600;letter-spacing:.12em;color:var(--dim);margin-bottom:9px;font-family:var(--mono)}
+.sub{font-size:12.5px;line-height:1.7;color:var(--dim);margin:0}
+.sub b{color:#B8BDB2;font-weight:700}
+
+/* choices */
+.choice{position:relative;width:100%;max-width:100%;display:flex;align-items:center;gap:14px;padding:19px 16px;border:1px solid #3A2A26;background:linear-gradient(180deg,#241A17,#161110);color:var(--bone);border-radius:2px;cursor:pointer;text-align:left;font-family:var(--jp);border-left:4px solid var(--red);transition:transform .08s ease,box-shadow .18s,opacity .18s,padding .2s}
+.choice .c-body{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.choice .c-label{font-size:24px;font-weight:900;letter-spacing:-.02em;line-height:1.1}
+.choice .c-sub{font-size:11.5px;color:#A79C97}
+.choice .c-mark{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:transparent;border:1px solid transparent;padding:4px 6px;white-space:nowrap;flex:none}
+.choice.blue{border-color:#22304E;border-left-color:var(--blue);background:linear-gradient(180deg,#141B29,#0F131B)}
+.choice.blue .c-sub{color:#93A0B8}
+.choice:active{transform:translateY(1px)}
+.choice.on{box-shadow:0 0 0 1px var(--red),0 0 30px rgba(224,74,51,.16)}
+.choice.blue.on{box-shadow:0 0 0 1px var(--blue),0 0 30px rgba(90,141,242,.16)}
+.choice.on .c-mark{color:var(--bone);border-color:rgba(237,233,219,.3);background:rgba(237,233,219,.08)}
+.choice.dimmed{opacity:.4}
+.choice.compact{padding:12px 15px}
+.choice.compact .c-label{font-size:18px}
+.choice.compact .c-sub{display:none}
+
+.mine{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);justify-content:center;padding:1px 0;flex-wrap:wrap;text-align:center}
+.mine b{color:#C9C6B6;font-weight:700}
+.mine button{background:none;border:0;color:var(--dim);font-size:11.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-family:var(--jp);padding:5px}
+
+/* status strip */
+.strip{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);background:rgba(23,29,23,.55);font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+.strip .n{color:#C9C6B6}
+.bar{height:2px;background:#232B23;overflow:hidden;margin-top:-13px}
+.bar i{display:block;height:100%;width:0;background:var(--amber);transition:width .9s linear}
+
+/* result */
+.ann{border:1px solid var(--line-2);background:linear-gradient(180deg,#1A211A,#10150F);padding:17px;display:flex;flex-direction:column;gap:11px;min-width:0;animation:rise .35s ease}
+@keyframes rise{from{transform:translateY(6px)}to{transform:none}}
+.ann-head{font-size:clamp(32px,10vw,44px);font-weight:900;letter-spacing:-.045em;line-height:1.02;margin:0}
+.ann-head.red{color:var(--red-soft)}.ann-head.blue{color:var(--blue-soft)}.ann-head.amber{color:var(--amber)}
+.ann-body{font-size:13.5px;line-height:1.7;color:#C4CABE;margin:0;white-space:pre-line}
+.split{display:flex;height:10px;gap:2px;background:#1B221B;border:1px solid var(--line);overflow:hidden}
+.split i{display:block;height:100%}
+.split .s-r{background:var(--red)}.split .s-b{background:var(--blue)}
+.counts{display:flex;gap:2px}
+.count{flex:1;padding:2px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.count .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;color:var(--dim);overflow-wrap:anywhere}
+.count .v{font-family:var(--mono);font-size:23px;font-weight:600;line-height:1}
+.count.r .v{color:var(--red-soft)}.count.b .v{color:var(--blue-soft)}
+.wh-line{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dim);flex-wrap:wrap}
+.wh-line .ok{color:var(--green)}.wh-line .ng{color:#C9705F}
+.mini{appearance:none;border:1px solid var(--line-2);background:#1C231C;color:#C9C6B6;font-family:var(--jp);font-size:12px;padding:9px 12px;border-radius:2px;cursor:pointer}
+.mini:hover{background:#232B23}
+
+/* settings */
+details.host{border:1px solid var(--line);background:rgba(23,29,23,.4)}
+details.host > summary{list-style:none;cursor:pointer;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+details.host > summary::-webkit-details-marker{display:none}
+details.host > summary::after{content:"+";font-size:14px;color:var(--line-2)}
+details.host[open] > summary::after{content:"\2212"}
+details.host .inner{padding:0 13px 13px;display:flex;flex-direction:column;gap:9px}
+.lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin:2px 0 -3px}
+input{font-family:var(--jp);font-size:14px;color:var(--bone);background:#0D110D;border:1px solid var(--line-2);border-radius:2px;padding:10px 11px;width:100%;appearance:none;-webkit-appearance:none}
+input:focus,button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.row{display:flex;gap:8px}
+.row > *{flex:1}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:#C4CABE;padding:2px 0}
+.switch{position:relative;width:40px;height:23px;flex:none;background:#242B24;border:1px solid var(--line-2);border-radius:99px;cursor:pointer;transition:background .15s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;background:#6B746A;border-radius:50%;transition:transform .15s,background .15s}
+.switch.on{background:#1E3A26;border-color:#2F6B41}
+.switch.on::after{transform:translateX(17px);background:var(--green)}
+.tab{appearance:none;background:none;border:1px solid transparent;color:var(--dim);font-family:var(--jp);font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:2px;cursor:pointer;letter-spacing:.02em}
+.tab.on{background:#1E2620;border-color:var(--line-2);color:var(--bone)}
+.slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.slot{aspect-ratio:1;border:1px solid var(--line);background:#0E130E;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;color:var(--dim);border-radius:2px}
+.slot.filled{background:#1B2A1E;border-color:#2F6B41;color:#C6E4CD}
+.roster{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11.5px;padding:4px 8px;border:1px solid var(--line);background:#141A14;border-radius:2px;color:#B8BDB2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.mine-name{border-color:#3A5A42;color:#C6E4CD}
+.chip.tent{border-color:#4A4229;color:#D8C48A;background:#1A1710}
+.team{border:1px solid var(--line);background:linear-gradient(180deg,#171D17,#101510);padding:12px;display:flex;flex-direction:column;gap:5px}
+.team.red{border-left:3px solid var(--red)}
+.team.blue{border-left:3px solid var(--blue)}
+.team-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:3px}
+.team-sum{font-family:var(--mono);font-size:17px;font-weight:600}
+.team.red .team-sum{color:var(--red-soft)}
+.team.blue .team-sum{color:var(--blue-soft)}
+.prow{display:flex;justify-content:space-between;font-size:13px;color:#C4CABE;gap:8px}
+.prow b{font-family:var(--mono);font-size:11.5px;color:var(--dim);font-weight:600}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:var(--bone);color:#0A0C0A;font-size:12.5px;font-weight:700;padding:11px 16px;border-radius:2px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= 設定 ================= */
+var RELAY='https://ntfy.sh';
+var TOKEN_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+var MIN_VOTES=3;          // これ集まったら結論
+var QUIET=45;             // 発表後、次の受付までの静寂(秒)
+var DEFAULT_CHANNEL='mgo2pc-mix';
+var HEARTBEAT=7000;
+
+/* ================= 状態 ================= */
+var S={
+  cid:rid(8),
+  channel:'',
+  log:[],            // 投票ログ（全員が同じ順序で再生）
+  st:null,           // 再生結果
+  mine:null,         // 今のラウンドで自分が入れた選択
+  connected:false,
+  webhook:'', notify:true,
+  peers:{},          // cid -> {at, w}
+  posted:{},         // 送信済み epoch
+  started:false,
+  mode:'recruit',      // recruit | balance
+  name:'',
+  cap:12,
+  rlog:[],             // 募集ログ
+  rpeers:{},
+  players:[], playersAt:0, sheetId:'1OGmjsQHj6SRsgA0OK1m9BhB3-MityX7Exs-niAhe9IM', gid:'1501436294',
+  teams:null,
+  proxy:'', expBusy:false, expLog:[]
+};
+var es=null, tickTimer=null, hbTimer=null, lastHeartbeat=0, lastPostAt=-1;
+
+/* ================= ユーティリティ ================= */
+function rid(n){var s='';for(var i=0;i<n;i++)s+=TOKEN_CHARS[Math.floor(Math.random()*TOKEN_CHARS.length)];return s;}
+function $(s){return document.querySelector(s);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function pad(n){n=String(n);return n.length<2?'0'+n:n>99?'99':n;}
+function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('on');},2400);}
+function nowSec(){return Date.now()/1000;}
+function vibrate(ms){try{navigator.vibrate&&navigator.vibrate(ms);}catch(e){}}
+function copy(text,label){
+  var done=function(){toast(label||'コピーしました');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,fb);}else{fb();}
+  function fb(){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch(e){toast('コピーできませんでした');}document.body.removeChild(ta);}
+}
+
+/* ================= コア: ログ再生 =================
+   全員が同じログを同じ順序で再生するので、ホストもサーバーも要らない。
+   時刻はリレーが付けた ts を使うので、端末の時計がずれていても結論は一致する。 */
+function delayFor(epoch){
+  var s='d'+epoch, h=0, i;
+  for(i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0;
+  return 10 + (Math.abs(h)%16);      // 10〜25秒（ラウンドごとに変わる）
+}
+function playLog(log, n){
+  var epoch=0, votes={}, anns=[], quietUntil=0, i, k, r, b, kind, at;
+  for(i=0;i<log.length;i++){
+    var e=log[i];
+    if(e.rs){ votes={}; continue; }
+    if(typeof e.c!=='string') continue;
+    if((e.ts||0)<quietUntil) continue;
+    votes[e.cid]=e.c;
+    r=0;b=0;
+    for(k in votes){ if(votes[k]==='r')r++; else if(votes[k]==='b')b++; }
+    kind=null;
+    if(r+b>=MIN_VOTES){
+      if(r>=MIN_VOTES&&r>b) kind='red';
+      else if(b>=Math.ceil(n/2)&&b>r) kind='blue';
+    }
+    if(kind){
+      at=(e.ts||nowSec())+delayFor(epoch);
+      anns.push({e:epoch,r:r,b:b,k:kind,at:at});
+      quietUntil=at+QUIET;
+      epoch++; votes={};
+    }
+  }
+  r=0;b=0;
+  for(k in votes){ if(votes[k]==='r')r++; else if(votes[k]==='b')b++; }
+  var last=anns.length?anns[anns.length-1]:null;
+  return {epoch:epoch,r:r,b:b,anns:anns,last:last,
+          pending:!!(last&&nowSec()<last.at)};
+}
+function verdict(kind,r,b,n){
+  if(kind==='red') return {head:'振り直しを推奨',cls:'red',body:'振り直したい '+r+' / このまま '+b+'（'+n+'人中）\n基準を超えたので、次の試合は組み直しで。'};
+  if(kind==='blue') return {head:'このまま続行',cls:'blue',body:'このまま '+b+' / 振り直したい '+r+'（'+n+'人中）\nこの話題はここで終了で。'};
+  return {head:'このまま続行',cls:'blue',body:'このまま '+b+' / 振り直したい '+r+'（'+n+'人中）\nこの話題はここで終了で。'};
+}
+
+/* ================= タブ ================= */
+function tabsHTML(cur){
+  return '<button class="tab'+(cur==='recruit'?' on':'')+'" data-act="mode" data-m="recruit">募集</button>'+
+         '<button class="tab'+(cur==='balance'?' on':'')+'" data-act="mode" data-m="balance">バランス</button>'+
+         '<button class="tab'+(cur==='alloc'?' on':'')+'" data-act="mode" data-m="alloc">振り分け</button>';
+}
+
+/* ================= 描画 ================= */
+function render(){
+  var app=$('#app');
+  if(S.mode==='recruit'){app.innerHTML=renderRecruit();return;}
+  if(S.mode==='alloc'){app.innerHTML=renderAlloc();return;}
+  var n=S.n||12;
+  var st=S.st||playLog([],n);
+  var v=st.last?verdict(st.last.k,st.last.r,st.last.b,n):null;
+  var showResult=!!(v&&nowSec()>=st.last.at);
+  var cooling=!!(st.last&&nowSec()<st.last.at+QUIET);
+  var compact=showResult||cooling;
+  var mine=currentMine(st);
+
+  var html='';
+  html+='<header class="hud">'+
+    tabsHTML('balance')+
+    '<span class="hud-name">'+esc(S.channel||'—')+'</span>'+
+    '<span class="hud-state'+(showResult?' on':'')+'" id="hudState">'+stateText(st)+'</span>'+
+    '<span class="sig'+(S.connected?' live':'')+'" id="sig"></span>'+
+  '</header>';
+
+  html+='<div class="stage">';
+
+  if(showResult){
+    html+='<div class="ann">'+
+      '<div class="mono">RESULT</div>'+
+      '<h2 class="ann-head '+v.cls+'">'+v.head+'</h2>'+
+      splitHTML(st.last,n)+
+      countsHTML(st.last,n)+
+      '<p class="ann-body">'+esc(v.body)+'</p>'+
+      '<div class="wh-line" id="whLine">'+webhookLine(st.last)+'</div>'+
+      '<button class="mini" data-act="copyResult" style="align-self:flex-start">結果をコピー</button>'+
+    '</div>';
+  }
+
+  html+='<div class="q"><small>'+(compact?'次の試合に向けて':'今のチームのままいい？')+'</small>'+(compact?'どうする？':'組み直す？')+'</div>';
+
+  html+='<button class="choice'+(compact?' compact':'')+(mine==='r'?' on':(mine?' dimmed':''))+'" data-act="vote" data-c="r">'+
+        '<span class="c-body"><span class="c-label">振り直したい</span><span class="c-sub">バランスを取り直す</span></span>'+
+        '<span class="c-mark">'+(mine==='r'?'受付済':'—')+'</span></button>';
+  html+='<button class="choice blue'+(compact?' compact':'')+(mine==='b'?' on':(mine?' dimmed':''))+'" data-act="vote" data-c="b">'+
+        '<span class="c-body"><span class="c-label">このまま</span><span class="c-sub">今のチームで続ける</span></span>'+
+        '<span class="c-mark">'+(mine==='b'?'受付済':'—')+'</span></button>';
+
+  html+='<div class="mine" id="mineLine">'+(mine
+        ? 'このラウンドは <b>'+(mine==='r'?'振り直したい':'このまま')+'</b> で受付済み · <button data-act="undo">取り消す</button>'
+        : '押したことは他の人に伝わりません')+'</div>';
+
+  html+='<div class="strip"><span id="stripLeft">'+stateText(st)+'</span><span class="n" id="stripRight">'+counterText(st)+'</span></div>';
+  html+='<div class="bar"><i id="barFill"></i></div>';
+
+  html+=settingsHTML();
+
+  html+='</div>';
+  app.innerHTML=html;
+  tickBar();
+}
+
+function currentMine(st){
+  if(!S.mine) return null;
+  return S.mine.epoch===st.epoch ? S.mine.c : null;
+}
+function stateText(st){
+  if(st.pending) return '集計中';
+  if(st.last&&nowSec()<st.last.at+QUIET) return '静寂 '+(Math.ceil(st.last.at+QUIET-nowSec()))+'s';
+  return '受付中';
+}
+function counterText(st){
+  var t=st.r+st.b;
+  if(st.pending) return 'あと'+Math.max(0,Math.ceil(st.last.at-nowSec()))+'s';
+  if(t>0) return t+'人 受付';
+  return '0人';
+}
+function splitHTML(a,n){
+  var total=n||1,s='';
+  if(a.r>0) s+='<i class="s-r" style="width:'+Math.min(100,a.r/total*100)+'%"></i>';
+  if(a.b>0) s+='<i class="s-b" style="width:'+Math.min(100,a.b/total*100)+'%"></i>';
+  return '<div class="split">'+s+'</div>';
+}
+function countsHTML(a,n){
+  return '<div class="counts">'+
+    '<div class="count r"><span class="k">振り直したい</span><span class="v">'+a.r+'</span></div>'+
+    '<div class="count b"><span class="k">このまま</span><span class="v">'+a.b+'</span></div>'+
+    '<div class="count"><span class="k">未投票</span><span class="v">'+Math.max(0,n-a.r-a.b)+'</span></div>'+
+  '</div>';
+}
+function webhookLine(a){
+  if(!S.webhook) return '<span>Discord通知: 未設定（下の設定から追加できます）</span>';
+  if(S.posted[a.e]) return '<span class="ok">✓ Discordに送信済み</span>';
+  if(S.st&&S.st.last&&a.e===S.st.last.e){
+    var err=postState.err;
+    if(err) return '<span class="ng">✗ 送信できませんでした（'+esc(err)+'）</span>';
+  }
+  return '<span>… Discordに送信中</span>';
+}
+var postState={err:null};
+function settingsHTML(){
+  return '<details class="host"><summary><span>設定</span></summary><div class="inner">'+
+    '<div class="lbl">合言葉（この文字列が同じ人だけが同じ集計に入ります）</div>'+
+    '<input id="chInput" value="'+esc(S.channel)+'" spellcheck="false" autocomplete="off">'+
+    '<button class="mini" data-act="chSave">この合言葉で接続する</button>'+
+    '<button class="mini" data-act="copyLink">この合言葉の共有リンクをコピー</button>'+
+    '<div class="lbl">Discord ウェブフックURL（この端末にだけ保存）</div>'+
+    '<input id="whInput" type="url" value="'+esc(S.webhook)+'" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off">'+
+    '<div class="row"><button class="mini" data-act="whSave">保存</button><button class="mini" data-act="whTest">テスト</button><button class="mini" data-act="whClear">削除</button></div>'+
+    '<div class="toggle"><span>結論が出たらDiscordに送る</span><div class="switch'+(S.notify?' on':'')+'" data-act="whToggle" role="switch" aria-checked="'+(S.notify?'true':'false')+'" tabindex="0"></div></div>'+
+    '<div class="lbl">自分の投票を取り消す（全員の集計から外れます）</div>'+
+    '<button class="mini" data-act="resetLog">今の投票をリセット</button>'+
+  '</div></details>';
+}
+
+/* ================= 通信 ================= */
+function dateKey(){
+  var d=new Date(Date.now()+9*3600*1000);   // JST基準で日付が変わる＝毎日自動リセット
+  return d.getUTCFullYear()+pad2(d.getUTCMonth()+1)+pad2(d.getUTCDate());
+}
+function pad2(n){return n<10?'0'+n:''+n;}
+function topicName(){
+  var base=S.channel||DEFAULT_CHANNEL;
+  return S.mode==='recruit'?(base+'-r'+dateKey()):base;
+}
+function publish(obj){
+  try{fetch(RELAY+'/'+encodeURIComponent(topicName()),{method:'POST',body:JSON.stringify(obj),cache:'no-store'}).catch(function(){});}catch(e){}
+}
+function connect(){
+  if(es){es.close();es=null;}
+  S.log=[];S.rlog=[];S.st=playLog([],S.n||12);
+  es=new EventSource(RELAY+'/'+encodeURIComponent(topicName())+'/sse?since=all');
+  es.onopen=function(){S.connected=true;hb(true);render();};
+  es.onerror=function(){S.connected=false;var s=$('#sig');if(s)s.className='sig';};
+  es.onmessage=function(ev){
+    var d;try{d=JSON.parse(ev.data);}catch(_){return;}
+    if(d.event!=='message'||!d.message)return;
+    var m;try{m=JSON.parse(d.message);}catch(_){return;}
+    onMsg(m,d.time);
+  };
+}
+function onMsg(m,relayTs){
+  if(!m||!m.t)return;
+  if(m.t==='hb'){
+    if(m.cid&&m.cid!==S.cid){S.peers[m.cid]={at:nowSec(),w:!!m.w};}
+    return;
+  }
+  if(m.t==='wp'){ if(typeof m.e==='number'){S.posted[m.e]=true;} return; }
+  if(m.t==='j'){
+    if(!m.cid)return;
+    S.rlog.push({cid:m.cid,n:(m.n||'?').slice(0,16),ts:relayTs||m.ts||nowSec()});
+    refreshRecruit();return;
+  }
+  if(m.t==='q'){
+    if(!m.cid)return;
+    S.rlog.push({cid:m.cid,quit:true,ts:relayTs||m.ts||nowSec()});
+    refreshRecruit();return;
+  }
+  if(m.t==='snap'){
+    var cc=(m.members||[]).map(function(n,i){return {cid:'dc'+i,n:String(n).slice(0,16),ts:nowSec()};});
+    var tt=(m.tent||[]).map(function(n,i){return {cid:'dt'+i,n:String(n).slice(0,16),ts:nowSec(),tent:true};});
+    S.rlog=cc.concat(tt);
+    S.dcCount=m.count||0;
+    if(S.cap)S.cap=m.cap||S.cap;
+    refreshRecruit();return;
+  }
+  if(m.t==='alloc'){ S.dcAlloc=m; refreshRecruit(); return; }
+  if(m.t==='rs'){ S.log.push({rs:true,ts:m.ts||relayTs||nowSec()}); refresh(); return; }
+  if(m.t==='v'){
+    if(!m.cid||(m.c!=='r'&&m.c!=='b'))return;
+    S.log.push({cid:m.cid,c:m.c,ts:relayTs||m.ts||nowSec(),id:m.id});
+    refresh();
+    return;
+  }
+}
+function hb(force){
+  var now=nowSec();
+  if(!force&&now-lastHeartbeat<HEARTBEAT)return;
+  lastHeartbeat=now;
+  publish({t:'hb',cid:S.cid,w:!S.webhook?0:1,ts:Math.floor(now)});
+  // 死んだピアを掃除
+  var k;for(k in S.peers){if(now-S.peers[k].at>20000)delete S.peers[k];}
+}
+
+/* ================= 再描画（差分が小さければDOMを壊さない） ================= */
+var lastRenderKey='';
+function refresh(){
+  var before=S.st;
+  S.st=playLog(S.log,S.n||12);
+  var a=S.st.last?S.st.last.at:0;
+  var key=[S.st.epoch,S.st.r,S.st.b,S.st.pending,S.st.last?S.st.last.e:'-',nowSec()>=a?'1':'0',currentMine(S.st)].join('|');
+  if(key!==lastRenderKey){lastRenderKey=key;render();}
+  else tickBar();
+}
+
+function tickBar(){
+  var st=S.st;if(!st)return;
+  var fill=$('#barFill'),left=$('#stripLeft'),right=$('#stripRight');
+  if(st.pending&&st.last){
+    var total=delayFor(st.last.e);
+    var p=Math.max(0,Math.min(1,(delayFor(st.last.e)-(st.last.at-nowSec()))/total));
+    if(fill)fill.style.width=(p*100)+'%';
+    if(left)left.textContent='集計中';
+    if(right)right.textContent='あと'+Math.max(0,Math.ceil(st.last.at-nowSec()))+'s';
+  }else{
+    if(fill)fill.style.width='0%';
+    if(left)left.textContent=stateText(st);
+    if(right)right.textContent=counterText(st);
+  }
+  var hs=$('#hudState');if(hs)hs.textContent=stateText(st);
+  var sig=$('#sig');if(sig)sig.className='sig'+(S.connected?' live':'');
+}
+
+/* ================= 募集（カウントダウン置き換え） =================
+   画像の「11 → 10 → 9…」をボタン1つに。押した順に枠が埋まり、満員で確定。
+   日付が変わると自動でリセット（合言葉に日付が入るため）。 */
+function playRecruit(log,cap){
+  var list=[],idx={},i;
+  for(i=0;i<log.length;i++){
+    var e=log[i];
+    if(!e.cid)continue;
+    if(e.quit){ if(idx[e.cid]!==undefined){list.splice(idx[e.cid],1);idx={};for(var j=0;j<list.length;j++)idx[list[j].cid]=j;} continue; }
+    if(idx[e.cid]!==undefined){ list[idx[e.cid]].n=e.n||list[idx[e.cid]].n; continue; }
+    list.push({cid:e.cid,n:e.n||'?',ts:e.ts});
+    idx[e.cid]=list.length-1;
+  }
+  return {list:list,count:list.length,full:list.length>=cap,cap:cap};
+}
+function myName(){
+  var n=(S.name||'').trim();
+  if(n)return n.slice(0,16);
+  return 'ゲスト'+S.cid.slice(0,3).toUpperCase();
+}
+function renderRecruit(){
+  S.rec=playRecruit(S.rlog,S.cap||12);
+  var r=S.rec, cap=r.cap, left=Math.max(0,cap-r.count);
+  var inList=!!r.list.filter(function(p){return p.cid===S.cid;}).length;
+  var slots='';
+  for(var i=0;i<cap;i++){
+    var p=r.list[i];
+    if(p){
+      var ini=p.n.slice(0,1);
+      slots+='<div class="slot filled" title="'+esc(p.n)+'"><span>'+esc(ini.toUpperCase())+'</span></div>';
+    }else{
+      slots+='<div class="slot"></div>';
+    }
+  }
+  var html='';
+  html+='<header class="hud">'+
+    tabsHTML('recruit')+
+    '<span class="hud-name">'+esc(S.channel||'—')+'</span>'+
+    '<span class="sig'+(S.connected?' live':'')+'" id="sig"></span>'+
+  '</header>';
+  html+='<div class="stage">';
+  if(r.full){
+    html+='<div class="ann">'+
+      '<div class="mono">FULL</div>'+
+      '<h2 class="ann-head blue">'+cap+'人そろいました</h2>'+
+      '<p class="ann-body">このメンバーで開始できます。\n集計は自動で止まっています。</p>'+
+      '<button class="mini" data-act="copyRoster" style="align-self:flex-start">メンバーをコピー</button>'+
+      '<div class="wh-line" id="whLine2">'+webhookLine({e:'full'+dateKey()})+'</div>'+
+    '</div>';
+  }else{
+    html+='<div class="q"><small>'+esc(String(r.count)+' / '+cap+'人')+'</small>あと '+left+'人</div>';
+  }
+  html+='<div class="slots">'+slots+'</div>';
+  if(S.dcCount) html+='<p class="sub" style="margin:0">Discordの✅リアクションから自動集計中</p>';
+  html+='<div class="roster">'+r.list.map(function(p){
+      var me=p.cid===S.cid?' mine-name':'';
+      return '<span class="chip'+me+(p.tent?' tent':'')+'">'+(p.tent?'🟡 ':'')+esc(p.n)+'</span>';
+    }).join('')+(r.list.length?'':'<span class="hint" style="margin:0">まだ誰もいません</span>')+'</div>';
+
+  if(r.full){
+    html+='<div class="strip"><span>受付終了</span><span class="n">'+cap+'/'+cap+'</span></div>';
+  }else if(inList){
+    html+='<button class="choice blue on" data-act="quit" style="justify-content:center">'+
+          '<span class="c-body" style="align-items:center;text-align:center"><span class="c-label">参加中</span><span class="c-sub">タップで抜ける</span></span></button>';
+  }else{
+    html+='<button class="choice on" data-act="joinRoster" style="justify-content:center">'+
+          '<span class="c-body" style="align-items:center;text-align:center"><span class="c-label">集まる</span><span class="c-sub">押した順に枠が埋まります</span></span></button>';
+  }
+  if(!r.full) html+='<div class="mine">'+esc(myName())+' として参加します</div>';
+  html+='<details class="host"><summary><span>設定</span></summary><div class="inner">'+
+    '<div class="lbl">表示名（他の人にこの名前で見えます）</div>'+
+    '<input id="nameInput" value="'+esc(S.name)+'" placeholder="'+esc(myName())+'" maxlength="16" autocomplete="off">'+
+    '<button class="mini" data-act="nameSave">保存</button>'+
+    '<div class="lbl">募集人数</div>'+
+    '<input id="capInput" type="number" min="2" max="30" value="'+cap+'">'+
+    '<button class="mini" data-act="capSave">保存</button>'+
+    '<div class="lbl">合言葉（日付で自動リセットされます）</div>'+
+    '<input id="chInput" value="'+esc(S.channel)+'" spellcheck="false" autocomplete="off">'+
+    '<div class="row"><button class="mini" data-act="chSave">接続</button><button class="mini" data-act="copyLink">共有リンク</button></div>'+
+    '<div class="lbl">Discord ウェブフック（満員時に1回だけ送信）</div>'+
+    '<input id="whInput" type="url" value="'+esc(S.webhook)+'" placeholder="https://discord.com/api/webhooks/..." spellcheck="false" autocomplete="off">'+
+    '<div class="row"><button class="mini" data-act="whSave">保存</button><button class="mini" data-act="whTest">テスト</button><button class="mini" data-act="whClear">削除</button></div>'+
+  '</div></details>';
+  html+='</div>';
+  return html;
+}
+var rLastKey='';
+function refreshRecruit(){
+  var r=playRecruit(S.rlog,S.cap||12);
+  var key=[r.count,r.full,JSON.stringify(r.list.map(function(p){return p.n;}))].join('|');
+  if(key!==rLastKey){rLastKey=key;render();}
+}
+
+
+/* ================= 振り分け（シート直読み＋6v6最適化） ================= */
+function csvRows(text){
+  var rows=[],row=[],cur='',q=false,i;
+  for(i=0;i<text.length;i++){
+    var c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    }else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=''; }
+    else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+    else if(c!=='\r') cur+=c;
+  }
+  if(cur.length||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function parsePlayers(text){
+  var rows=csvRows(text),out=[],i,j,hdr=-1;
+  for(i=0;i<rows.length;i++){
+    if((rows[i][1]||'').indexOf('プレイヤー名')>=0){hdr=i;break;}
+  }
+  if(hdr<0)return out;
+  for(i=hdr+1;i<rows.length;i++){
+    var r=rows[i];
+    if(!r||!r[1]||!r[1].trim())continue;
+    var exp=parseFloat(String(r[2]||'').replace(/[^0-9.\-]/g,''));
+    if(isNaN(exp))continue;
+    out.push({name:r[1].trim().slice(0,16),exp:exp,fix:(r[3]||'なし').trim()});
+  }
+  return out;
+}
+function sheetURL(){
+  return 'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(S.sheetId)+
+         '/export?format=csv&gid='+encodeURIComponent(S.gid);
+}
+function fetchSheet(){
+  if(!S.sheetId){toast('シートIDが空です');return;}
+  toast('シートを読み込み中…');
+  fetch(sheetURL(),{cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+    .then(function(t){
+      var ps=parsePlayers(t);
+      if(!ps.length){toast('プレイヤー行が見つかりません。シートの共有設定を確認してください');return;}
+      S.players=ps;S.playersAt=Date.now();S.teams=null;
+      saveLS('mixvote.players',JSON.stringify(ps));
+      saveLS('mixvote.playersAt',String(S.playersAt));
+      toast(ps.length+'人を読み込みました');render();
+    })
+    .catch(function(e){toast('読み込み失敗: '+e.message+'（リンク共有になっているか確認）');});
+}
+function fixSide(f){
+  f=String(f||'').trim().toUpperCase();
+  if(f.indexOf('A')===0||f.indexOf('赤')===0||f==='1')return 'A';
+  if(f.indexOf('B')===0||f.indexOf('青')===0||f==='2')return 'B';
+  return null;
+}
+function allocate(){
+  var ps=S.players.slice();
+  if(ps.length<2){toast('プレイヤーが足りません');return;}
+  var n=ps.length, half=Math.floor(n/2);
+  if(n>16){ toast('16人まで対応しています'); return; }
+  var fixedA=[],fixedB=[],rest=[];
+  ps.forEach(function(p){
+    var s=fixSide(p.fix);
+    if(s==='A')fixedA.push(p); else if(s==='B')fixedB.push(p); else rest.push(p);
+  });
+  var needA=half-fixedA.length, needB=n-half-fixedB.length;
+  if(needA<0||needB<0){toast('固定チームの指定が人数と矛盾しています');return;}
+  var best=null,i;
+  // 残りから needA 人を選ぶ組み合わせを全探索（C(12,6)=924）
+  var idx=[];
+  for(i=0;i<rest.length;i++)idx.push(i);
+  function comb(arr,k,start,cur,out){
+    if(cur.length===k){out.push(cur.slice());return;}
+    for(var x=start;x<arr.length;x++){cur.push(arr[x]);comb(arr,k,x+1,cur,out);cur.pop();}
+  }
+  var combos=[];comb(idx,needA,0,[],combos);
+  combos.forEach(function(c){
+    var A=fixedA.concat(c.map(function(j){return rest[j];}));
+    var B=fixedB.concat(rest.filter(function(_,j){return c.indexOf(j)<0;}));
+    var sa=A.reduce(function(a,p){return a+p.exp;},0);
+    var sb=B.reduce(function(a,p){return a+p.exp;},0);
+    var score=Math.abs(sa-sb);
+    if(!best||score<best.score)best={A:A,B:B,sa:sa,sb:sb,score:score};
+  });
+  if(!best){toast('組み合わせが見つかりません');return;}
+  S.teams={A:best.A,B:best.B,sa:best.sa,sb:best.sb,diff:best.score,at:Date.now()};
+  render();
+}
+
+/* ---- Experience をWebで取得（プロキシ経由） ---- */
+function playerDBURL(){
+  return 'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(S.sheetId)+
+    '/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent('プレイヤーDB');
+}
+function parsePlayerDB(text){
+  var rows=csvRows(text),out=[],i;
+  for(i=0;i<rows.length;i++){
+    var r=rows[i];
+    if(!r||r.length<3)continue;
+    var url=String(r[2]||'').trim();
+    if(url.indexOf('mgo2pc.com/profile/')<0)continue;
+    var ex=parseFloat(String(r[3]||'').replace(/[^0-9.\-]/g,''));
+    out.push({name:String(r[1]||'').trim(),url:url,exp:isNaN(ex)?null:ex});
+  }
+  return out;
+}
+var XP_TABLE=[0, 125, 250, 375, 500, 650, 800, 950, 1100, 1250, 1400, 1550, 1700, 1850, 2000, 2175, 2350, 2525, 2725, 2975, 3275, 3625, 4075];
+function expFromXp(xp){
+  if(xp===null||xp===undefined||xp==='')return null;
+  xp=Number(xp);
+  if(!isFinite(xp)||xp<0)return null;
+  var lv=0;
+  while(lv+1<XP_TABLE.length&&xp>=XP_TABLE[lv+1])lv++;
+  var min=XP_TABLE[lv],next=XP_TABLE[lv+1];
+  var pr=(next===undefined)?1:Math.max(0,Math.min(1,(xp-min)/(next-min)));
+  return lv+pr;
+}
+function parseExpText(t){
+  try{var j=JSON.parse(t);if(j&&j.exp!=null)return Number(j.exp);if(j&&j.xp!=null)return expFromXp(j.xp);}catch(e){}
+  var lv=t.match(/GP\)\s+(\d{1,2})\s/);
+  if(!lv)return null;
+  var pr=t.match(/(\d{1,3})%\s+Weekly/);
+  var p=pr?parseInt(pr[1],10):0;
+  if(p>100)p=100;
+  return parseInt(lv[1],10)+p/100;
+}
+function expFetchAll(){
+  if(!S.proxy){toast('先に「取得プロキシURL」を設定してください');return;}
+  S.expBusy=true;S.expLog=['プレイヤーDBを読込中…'];render();
+  fetch(playerDBURL(),{cache:'no-store'})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+    .then(function(t){
+      var db=parsePlayerDB(t);
+      if(!db.length){S.expBusy=false;render();toast('プレイヤーDBからURLを読めませんでした');return;}
+      S.expLog=['対象 '+db.length+'人'];
+      var i=0,okN=0,ngN=0;
+      function step(){
+        if(i>=db.length){
+          S.expBusy=false;render();
+          toast('完了 成功'+okN+' / 失敗'+ngN);
+          return;
+        }
+        var p=db[i++];
+        var pu=S.proxy+(S.proxy.indexOf('?')<0?'?':'&')+'url='+encodeURIComponent(p.url);
+        fetch(pu,{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
+          var e=parseExpText(t);
+          if(e===null){ngN++;S.expLog.push('× '+p.name);}
+          else{
+            okN++;
+            S.players.forEach(function(q){if(q.name===p.name)q.exp=e;});
+            for(var k=0;k<S.expLog.length;k++){}
+            S.expLog.push('✓ '+p.name+' '+e.toFixed(2));
+          }
+          if(S.expLog.length>6)S.expLog=S.expLog.slice(-6);
+          render();setTimeout(step,350);
+        }).catch(function(){ngN++;S.expLog.push('× '+p.name+' 通信');render();setTimeout(step,350);});
+      }
+      step();
+    })
+    .catch(function(e){S.expBusy=false;render();toast('シート読込失敗: '+e.message);});
+}
+function renderAlloc(){
+  var ps=S.players, t=S.teams;
+  var html='';
+  html+='<header class="hud">'+tabsHTML('alloc')+'<span class="hud-name">'+esc(S.channel||'—')+'</span></header>';
+  html+='<div class="stage">';
+  if(!ps.length){
+    html+='<div class="q"><small>STEP 1</small>シートを読む</div>'+
+      '<p class="sub">スプレッドシートを「リンクを知っている全員が閲覧可」にして、下の設定にIDを入れて読み込んでください。</p>'+
+      '<button class="btn primary" data-act="fetchSheet">シートを読み込む</button>';
+  }else{
+    html+='<div class="q sub-q"><small>'+ps.length+'人 / 最終取得 '+ageText(S.playersAt)+'</small>'+
+          (t?'この組み分けでいく？':'振り分ける')+'</div>';
+    if(t){
+      html+=teamHTML('A',t.A,t.sa,'red')+teamHTML('B',t.B,t.sb,'blue');
+      html+='<div class="strip"><span>経験値差</span><span class="n">'+t.diff.toFixed(2)+'</span></div>';
+      html+='<button class="btn primary" data-act="alloc">引き直す</button>';
+      html+='<button class="mini" data-act="copyTeams">この組み分けをコピー</button>';
+    }else{
+      html+='<div class="roster">'+ps.map(function(p){
+        return '<span class="chip">'+esc(p.name)+' <b style="color:#8C948A;font-weight:600">'+p.exp.toFixed(2)+'</b></span>';
+      }).join('')+'</div>';
+      html+='<button class="btn primary" data-act="alloc">振り分ける</button>';
+    }
+    html+='<button class="mini" data-act="expFetch"'+(S.expBusy?' disabled':'')+'>'+
+          (S.expBusy?'Experience取得中…':'Experienceを更新（Web取得）')+'</button>';
+    if(S.expLog&&S.expLog.length) html+='<p class="sub" style="font-family:var(--mono);font-size:10.5px;line-height:1.7">'+esc(S.expLog.join(' / '))+'</p>';
+    html+='<div class="row"><button class="mini" data-act="fetchSheet">シート再取得</button>'+
+          '<button class="mini" data-act="mode" data-m="recruit">募集へ</button></div>';
+  }
+  html+='<details class="host"><summary><span>設定</span></summary><div class="inner">'+
+    '<div class="lbl">スプレッドシートID</div>'+
+    '<input id="sidInput" value="'+esc(S.sheetId)+'" spellcheck="false" autocomplete="off">'+
+    '<div class="lbl">シートID（gid）</div>'+
+    '<input id="gidInput" value="'+esc(S.gid)+'" spellcheck="false" autocomplete="off">'+
+    '<button class="mini" data-act="sheetSave">保存して読み込む</button>'+
+    '<div class="lbl">取得プロキシURL（ExperienceをWebで取る場合）</div>'+
+    '<input id="proxyInput" value="'+esc(S.proxy)+'" placeholder="https://xxx.workers.dev" spellcheck="false" autocomplete="off">'+
+    '<button class="mini" data-act="proxySave">保存</button>'+
+    '<p class="hint" style="margin:2px 0 0">シートは「リンクを知っている全員が閲覧可」にしてください。閲覧のみで読みます。</p>'+
+  '</div></details>';
+  html+='</div>';
+  return html;
+}
+function ageText(ts){
+  if(!ts)return '未取得';
+  var s=Math.floor((Date.now()-ts)/1000);
+  if(s<60)return s+'秒前';
+  if(s<3600)return Math.floor(s/60)+'分前';
+  return Math.floor(s/3600)+'時間前';
+}
+function teamHTML(label,team,sum,cls){
+  return '<div class="team '+cls+'">'+
+    '<div class="team-head"><span class="mono">TEAM '+label+'</span><span class="team-sum">'+sum.toFixed(2)+'</span></div>'+
+    team.map(function(p){return '<div class="prow"><span>'+esc(p.name)+'</span><b>'+p.exp.toFixed(2)+'</b></div>';}).join('')+
+  '</div>';
+}
+
+/* ================= Discord ウェブフック ================= */
+function validHook(u){return /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\/\d{5,}\/[\w-]{20,}$/.test(u);}
+function payload(a,n){
+  var v=verdict(a.k,a.r,a.b,n);
+  var color={red:0xE04A33,blue:0x5A8DF2,amber:0xE8A63C}[v.cls]||0xE8A63C;
+  return {username:'MIX Balance',allowed_mentions:{parse:[]},
+    embeds:[{title:v.head,description:v.body,color:color,
+      footer:{text:'匿名集計／誰が入れたかは記録・表示していません'}}]};
+}
+function elected(){
+  // ウェブフックを持つ端末のうち cid 最小の1台だけが送る（全員が同じ計算をするので結果は一致）
+  var now=nowSec(),best=S.cid;
+  for(var k in S.peers){
+    var p=S.peers[k];
+    if(!p.w)continue;
+    if(now-p.at>20000)continue;
+    if(k<best)best=k;
+  }
+  return best===S.cid;
+}
+function maybePostRecruit(){
+  var r=playRecruit(S.rlog,S.cap||12);
+  if(!r.full||!S.notify||!S.webhook)return;
+  var key='full'+dateKey();
+  if(S.posted[key])return;
+  if(!elected())return;
+  S.posted[key]=true;
+  var names=r.list.map(function(p,i){return (i+1)+'. '+p.n;}).join('\n');
+  postState.err=null;
+  fetch(S.webhook+'?wait=true',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:'MIX 募集',allowed_mentions:{parse:[]},
+      embeds:[{title:'12人そろいました',description:names,color:0x5A8DF2,
+        footer:{text:'自動募集／'+(S.channel||'')+' '+dateKey()}}]})})
+    .then(function(res){if(!res.ok){postState.err='HTTP '+res.status;delete S.posted[key];}render();})
+    .catch(function(){postState.err='通信エラー';delete S.posted[key];});
+}
+function maybePost(){
+  var st=S.st;
+  if(!S.notify||!S.webhook||!st||!st.last)return;
+  if(nowSec()<st.last.at)return;
+  var e=st.last.e;
+  if(S.posted[e])return;
+  if(!elected())return;
+  if(nowSec()-st.last.at<2)return;     // 他の端末の送信を待つ
+  if(lastPostAt===e)return;
+  lastPostAt=e;
+  postState.err=null;
+  fetch(S.webhook+'?wait=true',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload(st.last,S.n||12))})
+    .then(function(r){
+      if(r.ok){S.posted[e]=true;publish({t:'wp',e:e,cid:S.cid});}
+      else postState.err='HTTP '+r.status;
+      refresh();render();
+    })
+    .catch(function(e2){postState.err='通信エラー';render();});
+}
+
+/* ================= タイマー ================= */
+function tick(){
+  var now=nowSec();
+  if(!S.st)S.st=playLog(S.log,S.n||12);
+  S.st.pending=!!(S.st.last&&now<S.st.last.at);
+  // 新しい結論が出た瞬間の演出
+  if(S.st.last&&now>=S.st.last.at&&!S.posted['_seen'+S.st.last.e]){
+    S.posted['_seen'+S.st.last.e]=true;vibrate(30);refresh();render();
+  }
+  hb(false);
+  if(S.mode==='alloc'&&!S.allocBusy&&S.players.length&&now-lastSheet>300){lastSheet=now;S.allocBusy=1;fetchSheet();setTimeout(function(){S.allocBusy=0;},5000);}
+  if(S.mode==='recruit'){refreshRecruit();maybePostRecruit();}
+  else maybePost();
+  tickBar();
+  var key=[S.st.epoch,S.st.r,S.st.b,S.st.pending,currentMine(S.st),nowSec()>=((S.st.last&&S.st.last.at)||0)?'1':'0'].join('|');
+  if(key!==lastRenderKey){lastRenderKey=key;render();}
+}
+function startTick(){if(!tickTimer)tickTimer=setInterval(tick,1000);}
+
+/* ================= イベント ================= */
+document.addEventListener('click',function(ev){
+  var t=ev.target.closest('[data-act]');
+  if(!t)return;
+  var act=t.getAttribute('data-act');
+
+  if(act==='vote'){
+    var c=t.getAttribute('data-c');
+    if(!S.st)S.st=playLog(S.log,S.n||12);
+    if(currentMine(S.st)===c)return;
+    S.mine={epoch:S.st.epoch,c:c};
+    publish({t:'v',cid:S.cid,c:c,ts:Date.now()/1000});
+    vibrate(14);
+    S.log.push({cid:S.cid,c:c,ts:nowSec()});
+    refresh();render();
+  }
+  else if(act==='undo'){
+    if(!S.st)return;
+    S.mine=null;
+    publish({t:'rs',cid:S.cid,ts:nowSec()});
+    S.log.push({rs:true,ts:nowSec()});
+    refresh();render();
+    toast('取り消しました');
+  }
+  else if(act==='resetLog'){
+    S.mine=null;
+    publish({t:'rs',cid:S.cid,ts:nowSec()});
+    S.log.push({rs:true,ts:nowSec()});
+    refresh();render();
+    toast('リセットしました（全員の画面に反映されます）');
+  }
+  else if(act==='copyResult'){
+    var st=S.st;
+    if(!st||!st.last)return;
+    var v=verdict(st.last.k,st.last.r,st.last.b,S.n||12);
+    copy('【MIX バランス確認】\n'+v.head+'\n'+v.body,'結果をコピーしました');
+  }
+  else if(act==='copyLink'){
+    if(location.protocol==='file:'){
+      copy(S.channel,'ファイル直開きでは共有リンクを作れません。合言葉「'+S.channel+'」を伝えてください');
+      return;
+    }
+    var base=location.origin+location.pathname;
+    copy(base+'?c='+encodeURIComponent(S.channel),'共有リンクをコピーしました');
+  }
+  else if(act==='chSave'){
+    var v2=(($('#chInput')||{}).value||'').trim().toLowerCase().replace(/[^a-z0-9\-_]/g,'');
+    if(v2.length<3){toast('3文字以上で入れてください');return;}
+    saveLS('mixvote.channel',v2);S.channel=v2;S.log=[];S.mine=null;S.posted={};
+    connect();startTick();render();
+    toast('「'+v2+'」で接続しました');
+  }
+  else if(act==='whSave'){
+    var u=(($('#whInput')||{}).value||'').trim();
+    if(!validHook(u)){toast('DiscordのウェブフックURLではありません');return;}
+    S.webhook=u;saveLS('mixvote.webhook',u);S.notify=true;toast('保存しました（この端末のみ）');render();
+  }
+  else if(act==='whClear'){
+    S.webhook='';saveLS('mixvote.webhook','');toast('削除しました');render();
+  }
+  else if(act==='whToggle'){
+    S.notify=!S.notify;render();
+  }
+  else if(act==='whTest'){
+    if(!S.webhook||!validHook(S.webhook)){toast('先にURLを保存してください');return;}
+    fetch(S.webhook+'?wait=true',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload({k:'red',r:3,b:2},S.n||12))})
+      .then(function(r){toast(r.ok?'送信できました':('失敗しました HTTP '+r.status));})
+      .catch(function(){toast('通信エラー。URLを確認してください');});
+  }
+});
+document.addEventListener('keydown',function(e){
+  if((e.key===' '||e.key==='Enter')&&document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute('data-act')==='whToggle'){
+    e.preventDefault();document.activeElement.click();
+  }
+});
+function getLS(k,d){try{return localStorage.getItem(k)||d;}catch(e){return d;}}
+function saveLS(k,v){try{if(v)localStorage.setItem(k,v);else localStorage.removeItem(k);}catch(e){}}
+
+/* ================= デモ（検証用） ================= */
+var DEMO=new URLSearchParams(location.search).get('demo')||window.__DEMO__||null;
+
+/* ================= 起動 ================= */
+var URL_CH=(new URLSearchParams(location.search).get('c')||'').toLowerCase().replace(/[^a-z0-9\-_]/g,'');
+S.channel=URL_CH.length>=3?URL_CH:getLS('mixvote.channel',DEFAULT_CHANNEL);
+S.webhook=getLS('mixvote.webhook','');
+S.n=12;
+S.mode=getLS('mixvote.mode','recruit');
+S.name=getLS('mixvote.name','');
+S.cap=parseInt(getLS('mixvote.cap','12'),10)||12;
+S.st=playLog([],S.n);
+S.rec=playRecruit([],S.cap);
+S.sheetId=getLS('mixvote.sheet',S.sheetId);
+S.gid=getLS('mixvote.gid',S.gid);
+S.proxy=getLS('mixvote.proxy','');
+try{S.players=JSON.parse(getLS('mixvote.players','[]'))||[];S.playersAt=parseInt(getLS('mixvote.playersAt','0'),10)||0;}catch(e){S.players=[];}
+if(DEMO){
+  var t0=nowSec();
+  if(DEMO==='idle'){ S.log=[]; }
+  else if(DEMO==='voted'){ S.log=[{cid:'aa',c:'r',ts:t0}]; S.mine={epoch:0,c:'r'}; S.connected=true; }
+  else if(DEMO==='pending'){ S.log=[{cid:'aa',c:'r',ts:t0-3},{cid:'bb',c:'r',ts:t0-2},{cid:'cc',c:'r',ts:t0-1}]; S.connected=true; }
+  else if(DEMO==='result'){ S.log=[{cid:'aa',c:'r',ts:t0-40},{cid:'bb',c:'r',ts:t0-39},{cid:'cc',c:'r',ts:t0-38},{cid:'dd',c:'b',ts:t0-37}]; S.connected=true; S.posted={0:true}; }
+  else if(DEMO==='nohook'){ S.log=[{cid:'aa',c:'b',ts:t0-40},{cid:'bb',c:'b',ts:t0-39},{cid:'cc',c:'b',ts:t0-38}]; S.connected=true; }
+  S.st=playLog(S.log,S.n);
+  startTick();render();
+}else{
+  connect();startTick();render();
+}
+})();
+</script>
+</body>
+</html>

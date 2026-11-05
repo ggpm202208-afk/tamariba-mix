@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MGO2PC MIX セットアップ・チェックリスト</title>
+<style>
+  :root{
+    --bg:#0e1116;
+    --panel:#151a21;
+    --panel-2:#1a2029;
+    --line:#252d39;
+    --line-soft:#1c232d;
+    --fg:#e8ecf3;
+    --fg-2:#9aa5b8;
+    --fg-3:#6b7688;
+    --blue:#5b9cf8;
+    --amber:#e9b949;
+    --red:#f0604f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,system-ui,sans-serif;
+    --spine:76px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font-family:var(--sans);font-size:15px;line-height:1.75;
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1100px 500px at 15% -10%,rgba(91,156,248,.07),transparent 70%);
+    background-attachment:fixed;
+  }
+  ::selection{background:rgba(91,156,248,.28)}
+
+  /* ---------- 上部バー ---------- */
+  .top{
+    position:sticky;top:0;z-index:40;
+    background:rgba(14,17,22,.88);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .top-in{
+    max-width:960px;margin:0 auto;padding:12px 24px;
+    display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  .brand{display:flex;flex-direction:column;gap:1px;margin-right:auto}
+  .brand b{font-size:14px;font-weight:700;letter-spacing:.01em}
+  .brand span{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-3)}
+  .meter{display:flex;align-items:center;gap:12px}
+  .meter .num{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--fg-2);white-space:nowrap}
+  .meter .num b{color:var(--fg);font-weight:600}
+  .bar{width:140px;height:4px;border-radius:99px;background:var(--line);overflow:hidden}
+  .bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#3f7fe0,var(--blue));transition:width .45s cubic-bezier(.2,.8,.2,1)}
+  .reset{
+    font-family:var(--sans);font-size:12px;color:var(--fg-3);background:transparent;
+    border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer;
+    transition:color .15s,border-color .15s
+  }
+  .reset:hover{color:var(--fg-2);border-color:#39465a}
+
+  /* ---------- 見出し ---------- */
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+
+  .hero{padding:56px 0 34px}
+  .hero .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--blue);margin:0 0 16px}
+  h1{
+    font-size:clamp(26px,4.4vw,40px);line-height:1.25;font-weight:800;
+    letter-spacing:-.025em;margin:0 0 14px;
+  }
+  .hero p{margin:0;color:var(--fg-2);max-width:58ch}
+  .facts{display:flex;gap:28px;flex-wrap:wrap;margin-top:26px;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--fg-3)}
+  .facts b{display:block;font-size:19px;color:var(--fg);letter-spacing:-.01em;font-weight:600;margin-top:2px}
+
+  /* 目次 */
+  .toc{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 46px;padding-bottom:34px;border-bottom:1px solid var(--line-soft)}
+  .toc a{
+    display:flex;align-items:center;gap:7px;text-decoration:none;color:var(--fg-2);
+    border:1px solid var(--line);border-radius:8px;padding:6px 11px 6px 9px;
+    font-size:12.5px;background:var(--panel);transition:border-color .15s,color .15s,background .15s
+  }
+  .toc a:hover{color:var(--fg);border-color:#3a4a60;background:var(--panel-2)}
+  .toc a .n{font-family:var(--mono);font-size:11px;color:var(--fg-3)}
+  .toc a.done{color:var(--blue);border-color:rgba(91,156,248,.4)}
+  .toc a.done .n{color:var(--blue)}
+
+  /* ---------- ステップ ---------- */
+  .steps{position:relative;padding-bottom:30px}
+  .rail{position:absolute;left:26px;top:14px;bottom:60px;width:1px;background:var(--line-soft)}
+  .rail i{position:absolute;left:0;top:0;width:1px;height:0;background:linear-gradient(180deg,var(--blue),rgba(91,156,248,.25));transition:height .5s cubic-bezier(.2,.8,.2,1)}
+
+  .step{position:relative;display:grid;grid-template-columns:var(--spine) 1fr;gap:0;padding:0 0 8px}
+  .node{
+    position:relative;z-index:2;width:54px;height:54px;margin-top:2px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;color:var(--fg-3);
+    background:var(--bg);border:1px solid var(--line);border-radius:14px;
+    transition:color .3s,border-color .3s,background .3s,box-shadow .3s
+  }
+  .step.done .node{color:#cfe1ff;border-color:rgba(91,156,248,.55);background:rgba(91,156,248,.1);box-shadow:0 0 0 4px rgba(91,156,248,.06)}
+
+  .body{padding:0 0 54px}
+  .shead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .shead h2{font-size:19px;font-weight:700;letter-spacing:-.015em;margin:0}
+  .shead .mn{display:none}
+  .shead .dur{font-family:var(--mono);font-size:11px;color:var(--fg-3);letter-spacing:.06em}
+  .shead .cnt{
+    margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--fg-3);
+    letter-spacing:.06em;font-variant-numeric:tabular-nums
+  }
+  .step.done .shead .cnt{color:var(--blue)}
+  .lead{margin:0 0 18px;color:var(--fg-2);font-size:14px;max-width:62ch}
+
+  /* チェック項目 */
+  .checks{list-style:none;margin:0;padding:0;border-top:1px solid var(--line-soft)}
+  .checks li{border-bottom:1px solid var(--line-soft)}
+  .checks label{
+    display:flex;gap:12px;align-items:flex-start;padding:11px 4px 11px 2px;
+    cursor:pointer;transition:background .12s
+  }
+  .checks label:hover{background:rgba(255,255,255,.018)}
+  .checks input{position:absolute;opacity:0;width:0;height:0}
+  .box{
+    flex:0 0 auto;width:17px;height:17px;margin-top:4px;border-radius:5px;
+    border:1.5px solid #39465a;background:transparent;position:relative;
+    transition:background .18s,border-color .18s
+  }
+  .box::after{
+    content:"";position:absolute;left:4.5px;top:1.5px;width:5px;height:9px;
+    border:solid var(--bg);border-width:0 2px 2px 0;transform:rotate(45deg) scale(.4);
+    opacity:0;transition:opacity .18s,transform .18s
+  }
+  .checks input:checked + .box{background:var(--blue);border-color:var(--blue)}
+  .checks input:checked + .box::after{opacity:1;transform:rotate(45deg) scale(1)}
+  .checks input:focus-visible + .box{outline:2px solid var(--blue);outline-offset:3px}
+  .txt{flex:1;font-size:14px;line-height:1.65;transition:color .2s}
+  .checks input:checked ~ .txt{color:var(--fg-3);text-decoration:line-through;text-decoration-color:rgba(107,118,136,.5)}
+  .txt code,.snippet code,.warn code{
+    font-family:var(--mono);font-size:12.5px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+    padding:1.5px 6px;color:#c9d6ea;white-space:nowrap
+  }
+  .txt b{font-weight:700;color:var(--fg)}
+  .checks input:checked ~ .txt b{color:var(--fg-3)}
+
+  /* 注意 */
+  .warn{
+    display:flex;gap:10px;margin:16px 0 0;padding:11px 14px;
+    border-left:2px solid var(--amber);background:rgba(233,185,73,.055);
+    border-radius:0 8px 8px 0;font-size:13px;color:#d8cba8;line-height:1.65
+  }
+  .warn .ic{color:var(--amber);flex:0 0 auto;font-weight:700}
+  .warn.stop{border-left-color:var(--red);background:rgba(240,96,79,.06);color:#e8bdb7}
+  .warn.stop .ic{color:var(--red)}
+
+  /* コピー */
+  .snippet{
+    display:flex;align-items:center;gap:10px;margin:14px 0 0;
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:10px 11px 10px 14px
+  }
+  .snippet code{
+    flex:1;background:none;border:none;padding:0;font-size:12.5px;
+    color:#a9c4ea;white-space:nowrap;overflow-x:auto;scrollbar-width:none
+  }
+  .snippet code::-webkit-scrollbar{display:none}
+  .copy{
+    flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+    color:var(--fg-3);background:var(--panel-2);border:1px solid var(--line);
+    border-radius:6px;padding:5px 9px;cursor:pointer;transition:color .15s,border-color .15s
+  }
+  .copy:hover{color:var(--fg);border-color:#3a4a60}
+  .copy.ok{color:var(--blue);border-color:rgba(91,156,248,.5)}
+
+  /* 変数表 */
+  .vars{width:100%;border-collapse:collapse;margin:16px 0 0;font-size:13px}
+  .vars th{
+    text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--fg-3);font-weight:400;
+    padding:0 12px 8px 0;border-bottom:1px solid var(--line)
+  }
+  .vars td{padding:9px 12px 9px 0;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  .vars td:first-child{font-family:var(--mono);font-size:12.5px;color:#a9c4ea;white-space:nowrap}
+  .vars .tag{
+    font-family:var(--mono);font-size:10px;letter-spacing:.1em;padding:1.5px 6px;border-radius:4px;
+    border:1px solid var(--line);color:var(--fg-3)
+  }
+  .vars .tag.sec{color:var(--amber);border-color:rgba(233,185,73,.35)}
+
+  /* 締め */
+  .end{
+    margin:8px 0 0;padding:26px 24px;border:1px solid var(--line);border-radius:14px;
+    background:linear-gradient(160deg,rgba(91,156,248,.06),transparent 60%);position:relative;overflow:hidden
+  }
+  .end h3{margin:0 0 8px;font-size:16px}
+  .end p{margin:0;color:var(--fg-2);font-size:13.5px}
+
+  /* トラブル */
+  .trouble{margin-top:54px}
+  .trouble h2{font-size:16px;margin:0 0 4px;letter-spacing:-.01em}
+  .trouble p.sub{margin:0 0 16px;color:var(--fg-3);font-size:12.5px;font-family:var(--mono)}
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t th{
+    text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--fg-3);font-weight:400;padding:0 14px 8px 0;border-bottom:1px solid var(--line)
+  }
+  table.t td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--fg-2)}
+  table.t td:first-child{color:var(--fg);width:30%}
+  table.t td code{font-family:var(--mono);font-size:12px;color:#a9c4ea;background:none;border:none;padding:0}
+
+  footer{margin:60px 0 0;padding:26px 0 60px;border-top:1px solid var(--line-soft);color:var(--fg-3);font-size:12px;font-family:var(--mono);letter-spacing:.04em;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+  @media (max-width:720px){
+    :root{--spine:0px}
+    .wrap{padding:0 18px}
+    .top-in{padding:10px 18px;gap:12px}
+    .brand span{display:none}
+    .bar{width:88px}
+    .hero{padding:36px 0 24px}
+    .rail{display:none}
+    .step{grid-template-columns:1fr}
+    .node{display:none}
+    .shead h2{font-size:17px}
+    .shead .mn{display:inline;color:var(--fg-3);margin-right:8px;font-weight:400}
+    .toc{margin-bottom:32px}
+    .vars td:first-child{font-size:11.5px}
+    .snippet code{font-size:11.5px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+    html{scroll-behavior:auto}
+  }
+  @media print{
+    body{background:#fff;color:#111}
+    .top,.toc,.copy,.reset{display:none}
+    .node{color:#111;border-color:#ccc}
+    .warn{background:#fdf7e8;color:#4a3d16}
+    .snippet,.body,.step{break-inside:avoid}
+    .lead,.txt{color:#333}
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="top-in">
+    <div class="brand">
+      <b>MGO2PC MIX セットアップ</b>
+      <span>Setup checklist · ①—⑨</span>
+    </div>
+    <div class="meter">
+      <div class="num"><b id="cn">0</b> / <span id="tn">49</span> 項目</div>
+      <div class="bar"><i id="fill"></i></div>
+    </div>
+    <button class="reset" id="reset">リセット</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Cloudflare Workers ・ Discord Bot</p>
+    <h1>上から順に、<br>終わったものから潰す。</h1>
+    <p>9ステップ・49項目。所要40〜50分。各項目をタップすると取り消し線が入り、進捗はこの端末に保存されます。順番を飛ばすと動かない箇所があるので、上から進めてください。</p>
+    <div class="facts">
+      <div><b>40〜50分</b>所要時間</div>
+      <div><b>49</b>チェック項目</div>
+      <div><b>0円</b>月額費用</div>
+    </div>
+  </header>
+
+  <nav class="toc" id="toc">
+    <a href="#s1" data-step="1"><span class="n">①</span>Bot作成</a>
+    <a href="#s2" data-step="2"><span class="n">②</span>招待</a>
+    <a href="#s3" data-step="3"><span class="n">③</span>シート</a>
+    <a href="#s4" data-step="4"><span class="n">④</span>KV</a>
+    <a href="#s5" data-step="5"><span class="n">⑤</span>Worker</a>
+    <a href="#s6" data-step="6"><span class="n">⑥</span>変数</a>
+    <a href="#s7" data-step="7"><span class="n">⑦</span>Cron</a>
+    <a href="#s8" data-step="8"><span class="n">⑧</span>募集作成</a>
+    <a href="#s9" data-step="9"><span class="n">⑨</span>動作確認</a>
+  </nav>
+
+  <div class="steps">
+    <div class="rail"><i id="railfill"></i></div>
+
+    <!-- ① -->
+    <article class="step" id="s1" data-step="1">
+      <div class="node">①</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">①</span>Discord Botを作る</h2><span class="dur">5分</span><span class="cnt">0 / 8</span></div>
+        <p class="lead">Botのアカウントを作り、トークンとApplication IDの2つを手元に控えます。この2つが以降すべての土台です。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="1-1"><span class="box"></span><span class="txt"><code>discord.com/developers/applications</code> を開く</span></label></li>
+          <li><label><input type="checkbox" data-id="1-2"><span class="box"></span><span class="txt">右上の <b>New Application</b> → 名前を入力（例: <code>MIX募集</code>）→ <b>Create</b></span></label></li>
+          <li><label><input type="checkbox" data-id="1-3"><span class="box"></span><span class="txt">左メニューの <b>Bot</b> を開く</span></label></li>
+          <li><label><input type="checkbox" data-id="1-4"><span class="box"></span><span class="txt"><b>Reset Token</b> → <b>Yes, do it!</b> を押す</span></label></li>
+          <li><label><input type="checkbox" data-id="1-5"><span class="box"></span><span class="txt">表示されたトークンをメモした<br><span style="color:var(--fg-3);font-size:12.5px">※ 二度と再表示できません</span></span></label></li>
+          <li><label><input type="checkbox" data-id="1-6"><span class="box"></span><span class="txt"><b>General Information</b> を開き、<b>Application ID</b>（18〜19桁）をメモした</span></label></li>
+          <li><label><input type="checkbox" data-id="1-7"><span class="box"></span><span class="txt"><b>Privileged Gateway Intents</b> が3つともOFFのままであることを確認した</span></label></li>
+        </ul>
+        <div class="warn"><span class="ic">!</span><span>トークンはパスワードと同じです。GitHubに上げない、人に見せない。漏れたら Reset Token で即座に無効化できます。</span></div>
+        <div class="warn"><span class="ic">!</span><span>インテントは<b>全部OFFで動きます</b>。リアクションの取得に特権インテントは不要で、メッセージ本文も読みません。</span></div>
+      </div>
+    </article>
+
+    <!-- ② -->
+    <article class="step" id="s2" data-step="2">
+      <div class="node">②</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">②</span>Botをサーバーに招待する</h2><span class="dur">3分</span><span class="cnt">0 / 6</span></div>
+        <p class="lead">権限を指定したURLで招待します。ここで権限を間違えると、あとで「人数が0のまま」になります。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="2-1"><span class="box"></span><span class="txt">下のURLの <code>APP_ID</code> を①のApplication IDに置き換えてブラウザで開いた</span></label></li>
+          <li><label><input type="checkbox" data-id="2-2"><span class="box"></span><span class="txt">追加先サーバーを選び、<b>認証</b> → <b>認可</b> を押した</span></label></li>
+          <li><label><input type="checkbox" data-id="2-3"><span class="box"></span><span class="txt">サーバーのメンバー一覧にBotが増えている</span></label></li>
+          <li><label><input type="checkbox" data-id="2-4"><span class="box"></span><span class="txt">募集用チャンネルを作った（例: <code>#mix募集</code>）</span></label></li>
+          <li><label><input type="checkbox" data-id="2-5"><span class="box"></span><span class="txt">そのチャンネルを右クリック → <b>チャンネルIDをコピー</b> してメモした</span></label></li>
+          <li><label><input type="checkbox" data-id="2-6"><span class="box"></span><span class="txt">サーバー設定 → <b>連携サービス</b> で <code>mix bot</code> の権限に「リアクションを追加」が入っている</span></label></li>
+        </ul>
+        <div class="snippet"><code>https://discord.com/oauth2/authorize?client_id=APP_ID&amp;permissions=93248&amp;scope=bot%20applications.commands</code><button class="copy">コピー</button></div>
+        <p class="lead" style="margin:20px 0 8px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-3)">permissions=93248 の中身</p>
+        <table class="vars">
+          <tr><th>権限</th><th>用途</th></tr>
+          <tr><td>チャンネルを見る</td><td>募集チャンネルの読み取り</td></tr>
+          <tr><td>メッセージを送信</td><td>通知・振り分け結果の投稿</td></tr>
+          <tr><td>メッセージ履歴を読む</td><td><b style="color:var(--amber)">リアクション取得に必須</b>。無いと0人のまま</td></tr>
+          <tr><td>リアクションを追加</td><td>募集メッセージに ✅🟡 を付ける</td></tr>
+          <tr><td>埋め込みリンク</td><td>振り分け結果のカード表示</td></tr>
+          <tr><td>メッセージの管理</td><td>前日の募集メッセージ削除（<code>/reset</code> 時）</td></tr>
+        </table>
+        <div class="warn stop"><span class="ic">!</span><span>古い <code>permissions=85056</code> のURLで招待済みなら、サーバー設定 → 連携サービス から一度 <b>Kick</b> し、上のURLで再招待してください。<b>「リアクションを追加」が無いと 🟡 だけ付かず、募集が壊れます。</b></span></div>
+        <div class="warn"><span class="ic">!</span><span>チャンネルIDが表示されない場合は、Discord設定 → 詳細設定 → <b>開発者モード</b> をON。</span></div>
+      </div>
+    </article>
+
+    <!-- ③ -->
+    <article class="step" id="s3" data-step="3">
+      <div class="node">③</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">③</span>スプレッドシートを準備する</h2><span class="dur">5分</span><span class="cnt">0 / 5</span></div>
+        <p class="lead">既存のシートをそのまま使えます。Workerは「Discordの表示名」と「B列の名前」を照合し、C列のURLからExperienceを引きます。B列は<b>mgo2pcのキャラ名である必要はありません</b>。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="3-1"><span class="box"></span><span class="txt"><code>プレイヤーDB</code> シートがある</span></label></li>
+          <li><label><input type="checkbox" data-id="3-2"><span class="box"></span><span class="txt"><b>B列=名前 / C列=プロフィールURL / D列=Experience</b> になっている</span></label></li>
+          <li><label><input type="checkbox" data-id="3-3"><span class="box"></span><span class="txt">シートのURLから<b>シートID</b>をコピーしてメモした</span></label></li>
+          <li><label><input type="checkbox" data-id="3-4"><span class="box"></span><span class="txt">右上 <b>共有</b> → 一般的なアクセスを <b>「リンクを知っている全員」＋「閲覧者」</b> に変更した</span></label></li>
+          <li><label><input type="checkbox" data-id="3-5"><span class="box"></span><span class="txt">B列の名前が <b>Discordの表示名</b> と同じになっている（mgo2pcのキャラ名と違ってもOK）</span></label></li>
+        </ul>
+        <div class="snippet"><code>https://docs.google.com/spreadsheets/d/【ここがID】/edit</code><button class="copy">コピー</button></div>
+        <div class="warn stop"><span class="ic">!</span><span>「制限付き」のままだとWorkerがシートを読めません。Experienceが全員0になり、振り分けが機能しません。</span></div>
+        <div class="warn"><span class="ic">!</span><span>照合するのは「Discordの表示名」と「B列」だけです。<b>B列＝mgo2pcのキャラ名である必要はありません</b>（C列のURLが繋いでくれます）。<code>せお</code> と <code>SEO</code> のように違っていても、B列が表示名と同じなら正しく引けます。</span></div>
+        <div class="warn"><span class="ic">!</span><span><b>B列と表示名が違う人</b>は、Discordの表示名をそのまま mgo2pc のキャラ名として照合します。それも外れた場合だけ Experience 0 になり、振り分け時に <b>⚠️ プレイヤーDBに未登録</b> とDiscordに投稿されます。その人のURLを「プレイヤーを追加」に貼れば直ります。</span></div>
+      </div>
+    </article>
+
+    <!-- ④ -->
+    <article class="step" id="s4" data-step="4">
+      <div class="node">④</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">④</span>Cloudflare KVを作る</h2><span class="dur">3分</span><span class="cnt">0 / 3</span></div>
+        <p class="lead">「誰が増えたか」を判定するための保存場所です。ここが無いと差分通知が出ません。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="4-1"><span class="box"></span><span class="txt"><code>dash.cloudflare.com</code> にログイン（無料登録）</span></label></li>
+          <li><label><input type="checkbox" data-id="4-2"><span class="box"></span><span class="txt">左メニュー <b>Storage &amp; Databases</b> → <b>KV</b> → <b>Create a namespace</b></span></label></li>
+          <li><label><input type="checkbox" data-id="4-3"><span class="box"></span><span class="txt">名前を <code>mix-kv</code> にして作成した</span></label></li>
+        </ul>
+        <div class="warn"><span class="ic">!</span><span>ここではまだ何も紐付けません。⑤でWorkerを作ったあと、⑥で繋ぎます。</span></div>
+      </div>
+    </article>
+
+    <!-- ⑤ -->
+    <article class="step" id="s5" data-step="5">
+      <div class="node">⑤</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">⑤</span>Workerを作る</h2><span class="dur">10分</span><span class="cnt">0 / 6</span></div>
+        <p class="lead">配布した <code>pipeline/worker.js</code> をそのまま貼ります。編集は不要です。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="5-1"><span class="box"></span><span class="txt">左メニュー <b>Compute (Workers)</b> → <b>Workers &amp; Pages</b> → <b>Create</b></span></label></li>
+          <li><label><input type="checkbox" data-id="5-2"><span class="box"></span><span class="txt"><b>Worker</b> を選び、名前を <code>mix-pipeline</code> にして <b>Deploy</b></span></label></li>
+          <li><label><input type="checkbox" data-id="5-3"><span class="box"></span><span class="txt"><b>Edit code</b> を押してエディタを開いた</span></label></li>
+          <li><label><input type="checkbox" data-id="5-4"><span class="box"></span><span class="txt">エディタの中身を全部消し、<code>worker.js</code> の内容を<b>全部</b>貼り付けた</span></label></li>
+          <li><label><input type="checkbox" data-id="5-5"><span class="box"></span><span class="txt">右上 <b>Deploy</b> を押した</span></label></li>
+          <li><label><input type="checkbox" data-id="5-6"><span class="box"></span><span class="txt">発行されたURL（<code>https://mix-pipeline.xxxx.workers.dev</code>）をメモした</span></label></li>
+        </ul>
+        <div class="warn stop"><span class="ic">!</span><span>貼り付けが途中で切れると真っ白なエラーになります。先頭の <code>const API =</code> から最終行の <code>const text =</code> まで入っているか確認してください。</span></div>
+        <div class="warn"><span class="ic">!</span><span>編集中の右側プレビューは<b>まだ公開されていないコード</b>を動かしています。右上の <b>Deploy</b> を押すまで、外からURLを開いても繋がりません（<code>DNS_PROBE_FINISHED_NXDOMAIN</code> の原因）。</span></div>
+        <div class="warn"><span class="ic">!</span><span><code>Error 1101</code> が出たら、まず<b>ログではなくURL</b>を疑ってください。最新版は例外を握って理由をJSONで返すので、1101は出ません。</span></div>
+      </div>
+    </article>
+
+    <!-- ⑥ -->
+    <article class="step" id="s6" data-step="6">
+      <div class="node">⑥</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">⑥</span>環境変数とKVを紐付ける</h2><span class="dur">5分</span><span class="cnt">0 / 7</span></div>
+        <p class="lead">Workerの <b>Settings</b> → <b>Variables and Secrets</b> で順に追加します。変数名は1文字も変えないでください。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="6-1"><span class="box"></span><span class="txt"><code>DISCORD_BOT_TOKEN</code> を追加（種類は <b>Secret</b>／値は①のトークン）</span></label></li>
+          <li><label><input type="checkbox" data-id="6-2"><span class="box"></span><span class="txt"><code>CHANNEL_ID</code> を追加（②のチャンネルID）</span></label></li>
+          <li><label><input type="checkbox" data-id="6-3"><span class="box"></span><span class="txt"><code>SHEET_ID</code> を追加（③のシートID）</span></label></li>
+          <li><label><input type="checkbox" data-id="6-4"><span class="box"></span><span class="txt"><code>SETUP_KEY</code> を追加（<b>Secret</b>／好きな文字列 例: <code>mgo2pc2026</code>）</span></label></li>
+          <li><label><input type="checkbox" data-id="6-5"><span class="box"></span><span class="txt"><code>CAP</code>=<code>12</code> と <code>TOPIC</code>=<code>mgo2pc-mix</code> を追加（推奨）</span></label></li>
+          <li><label><input type="checkbox" data-id="6-6"><span class="box"></span><span class="txt"><b>Bindings</b> → <b>Add</b> → <b>KV namespace</b>／変数名は <b><code>KV</code></b>／④の <code>mix-kv</code> を選択</span></label></li>
+          <li><label><input type="checkbox" data-id="6-7"><span class="box"></span><span class="txt"><b>Deploy</b> を押し直した</span></label></li>
+          <li><label><input type="checkbox" data-id="6-8"><span class="box"></span><span class="txt"><code>/debug</code> を開いて <code>env.KV: true</code> と <code>signup_id</code> を確認した</span></label></li>
+        </ul>
+        <table class="vars">
+          <tr><th>変数名</th><th>値</th><th>種類</th></tr>
+          <tr><td>DISCORD_BOT_TOKEN</td><td>①のトークン</td><td><span class="tag sec">Secret</span></td></tr>
+          <tr><td>CHANNEL_ID</td><td>②のチャンネルID</td><td><span class="tag">Text</span></td></tr>
+          <tr><td>SHEET_ID</td><td>③のシートID</td><td><span class="tag">Text</span></td></tr>
+          <tr><td>SETUP_KEY</td><td>任意の文字列</td><td><span class="tag sec">Secret</span></td></tr>
+          <tr><td>CAP</td><td>12</td><td><span class="tag">Text</span></td></tr>
+          <tr><td>TOPIC</td><td>mgo2pc-mix</td><td><span class="tag">Text</span></td></tr>
+          <tr><td>WEBHOOK_URL</td><td>Discord Webhook（任意）</td><td><span class="tag">Text</span></td></tr>
+          <tr><td>PHANTOM_KEY</td><td>PhantomJSCloudのキー（任意）</td><td><span class="tag sec">Secret</span></td></tr>
+        </table>
+        <div class="warn stop"><span class="ic">!</span><span>KVのバインディング名が <code>KV</code> でないと差分通知が出ません。別名にすると無言で機能しなくなります。</span></div>
+        <div class="warn"><span class="ic">!</span><span>変数を追加しただけでは反映されません。最後に必ず <b>Deploy</b> を押してください。</span></div>
+        <div class="warn"><span class="ic">!</span><span><code>/debug</code> は<b>変数が入っているか</b>を一覧で返します（値そのものは出ません）。<code>/status</code> が繋がらないときは先にこちらを開いてください。</span></div>
+      </div>
+    </article>
+
+    <!-- ⑦ -->
+    <article class="step" id="s7" data-step="7">
+      <div class="node">⑦</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">⑦</span>Cronを設定する</h2><span class="dur">2分</span><span class="cnt">0 / 2</span></div>
+        <p class="lead">1分ごとにリアクションを数えます。投稿されるのは変化があったときだけなので、通知が溢れることはありません。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="7-1"><span class="box"></span><span class="txt">Worker → <b>Settings</b> → <b>Triggers</b> → <b>Cron Triggers</b> → <b>Add</b></span></label></li>
+          <li><label><input type="checkbox" data-id="7-2"><span class="box"></span><span class="txt"><code>* * * * *</code>（毎分）を入力して追加した</span></label></li>
+        </ul>
+        <div class="snippet"><code>* * * * *</code><button class="copy">コピー</button></div>
+      </div>
+    </article>
+
+    <!-- ⑧ -->
+    <article class="step" id="s8" data-step="8">
+      <div class="node">⑧</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">⑧</span>募集メッセージを作る</h2><span class="dur">3分</span><span class="cnt">0 / 5</span></div>
+        <p class="lead">WorkerのURLに合言葉を付けて開くだけです。メッセージIDはKVに自動保存されるので、環境変数を書き換える必要はありません。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="8-1"><span class="box"></span><span class="txt">下のURLの <code>YOUR-WORKER</code> と <code>合言葉</code> を置き換えてブラウザで開いた</span></label></li>
+          <li><label><input type="checkbox" data-id="8-2"><span class="box"></span><span class="txt"><code>{"ok": true, "message_id": ...}</code> が返ってきた</span></label></li>
+          <li><label><input type="checkbox" data-id="8-3"><span class="box"></span><span class="txt">Discordの募集チャンネルに募集メッセージが投稿されている</span></label></li>
+          <li><label><input type="checkbox" data-id="8-4"><span class="box"></span><span class="txt">そのメッセージに ✅ と 🟡 のリアクションが付いている</span></label></li>
+          <li><label><input type="checkbox" data-id="8-5"><span class="box"></span><span class="txt">KVを使っていない場合のみ、返った <code>message_id</code> を <code>SIGNUP_MESSAGE_ID</code> に入れてDeployした</span></label></li>
+        </ul>
+        <div class="snippet"><code>https://YOUR-WORKER.workers.dev/setup?key=合言葉</code><button class="copy">コピー</button></div>
+        <div class="warn"><span class="ic">!</span><span><code>forbidden</code> が返るのは合言葉違いだけです。⑥の <code>SETUP_KEY</code> を確認してください。</span></div>
+        <div class="warn"><span class="ic">!</span><span><code>/setup</code> は何度開いても<b>メッセージが増えません</b>。生きている募集があれば <code>reused: true</code> で再利用します。作り直したいときは末尾に <code>&amp;force=1</code> を付けてください。</span></div>
+      </div>
+    </article>
+
+    <!-- ⑨ -->
+    <article class="step" id="s9" data-step="9">
+      <div class="node">⑨</div>
+      <div class="body">
+        <div class="shead"><h2><span class="mn">⑨</span>動作確認</h2><span class="dur">5分</span><span class="cnt">0 / 8</span></div>
+        <p class="lead">ここまで来たら、実際に押して確かめます。1つでも落ちたら、その項目の番号をトラブルシューティングで引いてください。</p>
+        <ul class="checks">
+          <li><label><input type="checkbox" data-id="9-1"><span class="box"></span><span class="txt"><code>/status</code> を開き、<code>"kv": "ok"</code> になっている</span></label></li>
+          <li><label><input type="checkbox" data-id="9-2"><span class="box"></span><span class="txt">自分で ✅ を押し、1分待った</span></label></li>
+          <li><label><input type="checkbox" data-id="9-3"><span class="box"></span><span class="txt">募集メッセージが <b>1 / 12</b> に書き換わった</span></label></li>
+          <li><label><input type="checkbox" data-id="9-4"><span class="box"></span><span class="txt"><b>「✅ ◯◯ が参加」</b> の通知が投稿された</span></label></li>
+          <li><label><input type="checkbox" data-id="9-5"><span class="box"></span><span class="txt">別アカウントで 🟡 を押すと <b>仮予約</b> になり、枠が1つ減った</span></label></li>
+          <li><label><input type="checkbox" data-id="9-6"><span class="box"></span><span class="txt">13人目が押すと <b>⏳ 補欠 1番</b> と表示された</span></label></li>
+          <li><label><input type="checkbox" data-id="9-7"><span class="box"></span><span class="txt">本枠の人が ✅ を外すと <b>⬆️ 繰り上がり</b> が通知された</span></label></li>
+          <li><label><input type="checkbox" data-id="9-8"><span class="box"></span><span class="txt">12人そろった瞬間、<b>振り分け結果</b>が投稿され、募集が <b>【締切】</b> に変わった</span></label></li>
+        </ul>
+        <div class="snippet"><code>https://YOUR-WORKER.workers.dev/status</code><button class="copy">コピー</button></div>
+        <div class="warn"><span class="ic">!</span><span>9-3で止まる場合は ⑥の <code>KV</code>、9-4で止まる場合は ②の「メッセージ履歴を読む」を疑ってください。</span></div>
+      </div>
+    </article>
+  </div>
+
+  <div class="end">
+    <h3>全部チェックが付いたら、あとは毎日 <code style="font-family:var(--mono);font-size:12.5px;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1.5px 6px;color:#c9d6ea">/reset</code> を開くだけ</h3>
+    <p>前日の募集メッセージは自動で削除され、新しい募集が始まります。ブックマークに入れておくと1タップです。</p>
+  </div>
+
+  <section class="trouble">
+    <h2>詰まったとき</h2>
+    <p class="sub">症状 → 原因 → 対処</p>
+    <table class="t">
+      <tr><th>症状</th><th>原因</th><th>対処</th></tr>
+      <tr><td><code>/setup</code> が forbidden</td><td><code>SETUP_KEY</code> が違う</td><td>⑥の値を確認（Secretは再入力で上書き）</td></tr>
+      <tr><td><code>Error 1101</code></td><td>Worker内で例外</td><td>最新のworker.jsに貼り替える（理由がJSONで返る）</td></tr>
+      <tr><td><code>DNS_PROBE_FINISHED_NXDOMAIN</code></td><td>未Deploy／サブドメイン未登録</td><td>Deployを押す → <code>Visit</code>で開いたURLを使う</td></tr>
+      <tr><td>🟡 だけ付かない</td><td>「リアクションを追加」権限が無い</td><td>②のURLで Kick → 再招待</td></tr>
+      <tr><td>募集メッセージが増え続ける</td><td>旧コードで<code>/setup</code>を連打</td><td>最新版は自動で再利用（<code>reused: true</code>）</td></tr>
+      <tr><td>募集メッセージが出ない</td><td>トークンかチャンネルIDが違う</td><td>Workerの <b>Logs</b> を見る</td></tr>
+      <tr><td>人数が0のまま</td><td>「メッセージ履歴を読む」が無い</td><td>②のURLで再招待</td></tr>
+      <tr><td>通知が出ない</td><td><code>KV</code> 未設定 or 別名</td><td>⑥のBindingsを確認</td></tr>
+      <tr><td>名前が undefined</td><td>表示名が取れていない</td><td>Botの権限とサーバーメンバーを確認</td></tr>
+      <tr><td>特定の人だけExperience 0</td><td>B列と表示名が不一致＆APIにも同名が無い</td><td>そのURLを「プレイヤーを追加」に貼る</td></tr>
+      <tr><td>1分経っても更新されない</td><td>Cron未設定</td><td>⑦を確認</td></tr>
+      <tr><td>【締切】のまま</td><td>前日のセッションが残っている</td><td><code>/reset?key=...</code> を開く</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    <span>MGO2PC MIX 自動募集 · セットアップチェックリスト</span>
+    <span id="saved">進捗はこの端末に保存されます</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var KEY = 'mgo2pc-setup-v1';
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox]'));
+  var steps = Array.prototype.slice.call(document.querySelectorAll('.step'));
+  var total = boxes.length;
+
+  document.getElementById('tn').textContent = total;
+
+  function load() {
+    var s = {};
+    try { s = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { s = {}; }
+    boxes.forEach(function (b) { if (s[b.dataset.id]) b.checked = true; });
+  }
+  function save() {
+    var s = {};
+    boxes.forEach(function (b) { if (b.checked) s[b.dataset.id] = 1; });
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  function render() {
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    document.getElementById('cn').textContent = done;
+    document.getElementById('fill').style.width = (total ? (done / total * 100) : 0) + '%';
+    document.getElementById('railfill').style.height = (total ? (done / total * 100) : 0) + '%';
+
+    steps.forEach(function (st) {
+      var bs = st.querySelectorAll('input[type=checkbox]');
+      var d = 0;
+      Array.prototype.forEach.call(bs, function (b) { if (b.checked) d++; });
+      var cnt = st.querySelector('.cnt');
+      if (cnt) cnt.textContent = d + ' / ' + bs.length;
+      st.classList.toggle('done', d === bs.length && bs.length > 0);
+      var link = document.querySelector('.toc a[data-step="' + st.dataset.step + '"]');
+      if (link) link.classList.toggle('done', d === bs.length && bs.length > 0);
+    });
+  }
+
+  boxes.forEach(function (b) {
+    b.addEventListener('change', function () { save(); render(); });
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    if (!confirm('チェックを全部外しますか？')) return;
+    boxes.forEach(function (b) { b.checked = false; });
+    save(); render();
+  });
+
+  // コピー
+  Array.prototype.forEach.call(document.querySelectorAll('.copy'), function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.parentNode.querySelector('code');
+      var txt = code.textContent;
+      var done = function () {
+        btn.textContent = 'コピー済み';
+        btn.classList.add('ok');
+        setTimeout(function () { btn.textContent = 'コピー'; btn.classList.remove('ok'); }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(done, function () { fallback(txt, done); });
+      } else { fallback(txt, done); }
+    });
+  });
+  function fallback(txt, cb) {
+    var ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); cb(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  load(); render();
+})();
+</script>
+</body>
+</html>
