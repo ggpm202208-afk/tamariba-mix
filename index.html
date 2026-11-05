@@ -108,6 +108,9 @@ input:focus,button:focus-visible{outline:2px solid var(--amber);outline-offset:2
 .switch.on::after{transform:translateX(17px);background:var(--green)}
 .tab{appearance:none;background:none;border:1px solid transparent;color:var(--dim);font-family:var(--jp);font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:2px;cursor:pointer;letter-spacing:.02em}
 .tab.on{background:#1E2620;border-color:var(--line-2);color:var(--bone)}
+.readonly{display:flex;flex-direction:column;gap:5px;padding:15px 14px;border:1px dashed var(--line-2);background:rgba(23,29,23,.5);text-align:center}
+.readonly .ro-l{font-size:14px;letter-spacing:.04em}
+.readonly .ro-s{font-size:12px;color:var(--dim);line-height:1.55}
 .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
 .slot{aspect-ratio:1;border:1px solid var(--line);background:#0E130E;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;color:var(--dim);border-radius:2px}
 .slot.filled{background:#1B2A1E;border-color:#2F6B41;color:#C6E4CD}
@@ -160,7 +163,8 @@ var S={
   mode:'recruit',      // recruit | balance
   name:'',
   cap:12,
-  rlog:[],             // 募集ログ
+  rlog:[],             // 募集ログ（Discordから届いた確定分）
+  rlogWeb:[],          // 募集ログ（このページで「集まる」を押した分）
   rpeers:{},
   players:[], playersAt:0, sheetId:'1OGmjsQHj6SRsgA0OK1m9BhB3-MityX7Exs-niAhe9IM', gid:'1501436294',
   teams:null,
@@ -357,7 +361,7 @@ function publish(obj){
 }
 function connect(){
   if(es){es.close();es=null;}
-  S.log=[];S.rlog=[];S.st=playLog([],S.n||12);
+  S.log=[];S.rlog=[];S.rlogWeb=[];S.st=playLog([],S.n||12);
   es=new EventSource(RELAY+'/'+encodeURIComponent(topicName())+'/sse?since=all');
   es.onopen=function(){S.connected=true;hb(true);render();};
   es.onerror=function(){S.connected=false;var s=$('#sig');if(s)s.className='sig';};
@@ -377,18 +381,18 @@ function onMsg(m,relayTs){
   if(m.t==='wp'){ if(typeof m.e==='number'){S.posted[m.e]=true;} return; }
   if(m.t==='j'){
     if(!m.cid)return;
-    S.rlog.push({cid:m.cid,n:(m.n||'?').slice(0,16),ts:relayTs||m.ts||nowSec()});
+    S.rlogWeb.push({cid:m.cid,n:(m.n||'?').slice(0,16),ts:relayTs||m.ts||nowSec()});
     refreshRecruit();return;
   }
   if(m.t==='q'){
     if(!m.cid)return;
-    S.rlog.push({cid:m.cid,quit:true,ts:relayTs||m.ts||nowSec()});
+    S.rlogWeb.push({cid:m.cid,quit:true,ts:relayTs||m.ts||nowSec()});
     refreshRecruit();return;
   }
   if(m.t==='snap'){
     var cc=(m.members||[]).map(function(n,i){return {cid:'dc'+i,n:String(n).slice(0,16),ts:nowSec()};});
     var tt=(m.tent||[]).map(function(n,i){return {cid:'dt'+i,n:String(n).slice(0,16),ts:nowSec(),tent:true};});
-    S.rlog=cc.concat(tt);
+    S.rlog=cc.concat(tt);   // Discord分のみ。Web参加(rlogWeb)は別管理なので消えない
     S.dcCount=m.count||0;
     if(S.cap)S.cap=m.cap||S.cap;
     refreshRecruit();return;
@@ -461,7 +465,7 @@ function myName(){
   return 'ゲスト'+S.cid.slice(0,3).toUpperCase();
 }
 function renderRecruit(){
-  S.rec=playRecruit(S.rlog,S.cap||12);
+  S.rec=playRecruit(rlogAll(),S.cap||12);
   var r=S.rec, cap=r.cap, left=Math.max(0,cap-r.count);
   var inList=!!r.list.filter(function(p){return p.cid===S.cid;}).length;
   var slots='';
@@ -501,14 +505,10 @@ function renderRecruit(){
 
   if(r.full){
     html+='<div class="strip"><span>受付終了</span><span class="n">'+cap+'/'+cap+'</span></div>';
-  }else if(inList){
-    html+='<button class="choice blue on" data-act="quit" style="justify-content:center">'+
-          '<span class="c-body" style="align-items:center;text-align:center"><span class="c-label">参加中</span><span class="c-sub">タップで抜ける</span></span></button>';
   }else{
-    html+='<button class="choice on" data-act="joinRoster" style="justify-content:center">'+
-          '<span class="c-body" style="align-items:center;text-align:center"><span class="c-label">集まる</span><span class="c-sub">押した順に枠が埋まります</span></span></button>';
+    html+='<div class="readonly"><span class="ro-l">参加は Discord で</span>'+
+          '<span class="ro-s">募集メッセージの ✅（参加）／🟡（仮予約）を押してください</span></div>';
   }
-  if(!r.full) html+='<div class="mine">'+esc(myName())+' として参加します</div>';
   html+='<details class="host"><summary><span>設定</span></summary><div class="inner">'+
     '<div class="lbl">表示名（他の人にこの名前で見えます）</div>'+
     '<input id="nameInput" value="'+esc(S.name)+'" placeholder="'+esc(myName())+'" maxlength="16" autocomplete="off">'+
@@ -527,8 +527,18 @@ function renderRecruit(){
   return html;
 }
 var rLastKey='';
+/** 表示用: Discordのスナップショットのみ（名前の重複を除去） */
+function rlogAll(){
+  var seen={},out=[];
+  (S.rlog||[]).forEach(function(e){
+    if(e.quit)return;
+    var k=String(e.n||'').toLowerCase();
+    if(seen[k])return; seen[k]=1; out.push(e);
+  });
+  return out;
+}
 function refreshRecruit(){
-  var r=playRecruit(S.rlog,S.cap||12);
+  var r=playRecruit(rlogAll(),S.cap||12);
   var key=[r.count,r.full,JSON.stringify(r.list.map(function(p){return p.n;}))].join('|');
   if(key!==rLastKey){rLastKey=key;render();}
 }
@@ -774,7 +784,7 @@ function elected(){
   return best===S.cid;
 }
 function maybePostRecruit(){
-  var r=playRecruit(S.rlog,S.cap||12);
+  var r=playRecruit(rlogAll(),S.cap||12);
   if(!r.full||!S.notify||!S.webhook)return;
   var key='full'+dateKey();
   if(S.posted[key])return;
@@ -834,6 +844,46 @@ document.addEventListener('click',function(ev){
   var t=ev.target.closest('[data-act]');
   if(!t)return;
   var act=t.getAttribute('data-act');
+  if(act==='mode'){
+    S.mode=t.getAttribute('data-m')||'recruit';
+    saveLS('mixvote.mode',S.mode);
+    if(S.mode==='alloc'&&!S.players.length)setTimeout(fetchSheet,60);
+    render();return;
+  }
+  if(act==='nameSave'){
+    var nm=(($('#nameInput')||{}).value||'').trim().slice(0,16);
+    if(!nm){toast('名前を入れてください');return;}
+    S.name=nm;saveLS('mixvote.name',nm);toast('保存しました');render();return;
+  }
+  if(act==='capSave'){
+    var cv=parseInt((($('#capInput')||{}).value||''),10);
+    if(!(cv>=2&&cv<=30)){toast('2〜30で入れてください');return;}
+    S.cap=cv;saveLS('mixvote.cap',String(cv));toast('募集人数を '+cv+'人 にしました');render();return;
+  }
+  if(act==='sheetSave'){
+    var sv=(($('#sidInput')||{}).value||'').trim();
+    if(sv.length<10){toast('シートIDが短すぎます');return;}
+    S.sheetId=sv;saveLS('mixvote.sheet',sv);toast('保存しました');fetchSheet();return;
+  }
+  if(act==='proxySave'){
+    var pv=(($('#proxyInput')||{}).value||'').trim().replace(/\/+$/,'');
+    S.proxy=pv;saveLS('mixvote.proxy',pv);toast(pv?'保存しました':'削除しました');render();return;
+  }
+  if(act==='fetchSheet'){fetchSheet();return;}
+  if(act==='alloc'){allocate();return;}
+  if(act==='expFetch'){expFetchAll();return;}
+  if(act==='copyTeams'){
+    if(!S.teams){toast('先に振り分けてください');return;}
+    var tx='【振り分け】\n🔴 '+S.teams.A.map(function(q){return q.name+' '+q.exp.toFixed(2);}).join(' / ')+
+      '\n🔵 '+S.teams.B.map(function(q){return q.name+' '+q.exp.toFixed(2);}).join(' / ')+
+      '\n差 '+S.teams.diff.toFixed(2);
+    copy(tx,'組み分けをコピーしました');return;
+  }
+  if(act==='copyRoster'){
+    var rl=rlogAll();
+    if(!rl.length){toast('まだ誰もいません');return;}
+    copy(rl.map(function(q){return q.n;}).join('\n'),'メンバーをコピーしました');return;
+  }
 
   if(act==='vote'){
     var c=t.getAttribute('data-c');
