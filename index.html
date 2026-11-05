@@ -500,7 +500,8 @@ function renderRecruit(){
   if(S.dcCount) html+='<p class="sub" style="margin:0">Discordの✅リアクションから自動集計中</p>';
   html+='<div class="roster">'+r.list.map(function(p){
       var me=p.cid===S.cid?' mine-name':'';
-      return '<span class="chip'+me+(p.tent?' tent':'')+'">'+(p.tent?'🟡 ':'')+esc(p.n)+'</span>';
+      var im=p.av?'<img src="'+esc(p.av)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':'';
+      return '<span class="chip'+me+(p.tent?' tent':'')+'">'+im+(p.tent?'🟡 ':'')+esc(p.n)+'</span>';
     }).join('')+(r.list.length?'':'<span class="hint" style="margin:0">まだ誰もいません</span>')+'</div>';
 
   if(r.full){
@@ -989,5 +990,6 @@ if(DEMO){
 }
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
