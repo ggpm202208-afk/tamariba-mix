@@ -390,8 +390,12 @@ function onMsg(m,relayTs){
     refreshRecruit();return;
   }
   if(m.t==='snap'){
-    var cc=(m.members||[]).map(function(n,i){return {cid:'dc'+i,n:String(n).slice(0,16),ts:nowSec()};});
-    var tt=(m.tent||[]).map(function(n,i){return {cid:'dt'+i,n:String(n).slice(0,16),ts:nowSec(),tent:true};});
+    // 文字列でも {n,a} でも壊れないように正規化する
+    var avm=m.av||{};
+    var nm=function(x){ return (x&&typeof x==='object') ? String(x.n||x.name||'?') : String(x==null?'?':x); };
+    var af=function(x){ return (x&&typeof x==='object'&&x.a) ? x.a : (avm[nm(x)]||null); };
+    var cc=(m.members||[]).map(function(x,i){return {cid:'dc'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec()};});
+    var tt=(m.tent||[]).map(function(x,i){return {cid:'dt'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec(),tent:true};});
     S.rlog=cc.concat(tt);   // Discord分のみ。Web参加(rlogWeb)は別管理なので消えない
     S.dcCount=m.count||0;
     if(S.cap)S.cap=m.cap||S.cap;
