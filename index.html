@@ -774,7 +774,7 @@ function expFetchAll(){
           return;
         }
         var p=db[i++];
-        var pu=S.proxy+(S.proxy.indexOf('?')<0?'?':'&')+'url='+encodeURIComponent(p.url);
+        var pu=S.proxy.replace(/\/$/,'')+'/exp?url='+encodeURIComponent(p.url);   // /exp を忘れると無言で失敗する
         fetch(pu,{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
           var e=parseExpText(t);
           if(e===null){ngN++;S.expLog.push('× '+p.name);}
