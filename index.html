@@ -402,7 +402,8 @@ function onMsg(m,relayTs){
     var avm=m.av||{};
     var nm=function(x){ return (x&&typeof x==='object') ? String(x.n||x.name||'?') : String(x==null?'?':x); };
     var af=function(x){ return (x&&typeof x==='object'&&x.a) ? x.a : (avm[nm(x)]||null); };
-    var cc=(m.members||[]).map(function(x,i){return {cid:'dc'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec()};});
+    var lset={}; (m.lis||[]).forEach(function(x){ lset[nm(x)]=1; });
+    var cc=(m.members||[]).map(function(x,i){return {cid:'dc'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec(),lis:!!lset[nm(x)]};});
     var tt=(m.tent||[]).map(function(x,i){return {cid:'dt'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec(),tent:true};});
     S.rlog=cc.concat(tt);   // Discord分のみ。Web参加(rlogWeb)は別管理なので消えない
     S.dcCount=m.count||0;
@@ -730,6 +731,27 @@ function expFetchAll(){
     })
     .catch(function(e){S.expBusy=false;render();toast('シート読込失敗: '+e.message);});
 }
+/* 募集メンバーだけで振り分け直す（Workerの /plan を利用） */
+function planFromRecruit(){
+  var list=(S.rlog||[]).filter(function(x){return !x.quit&&x.n;});
+  var names=list.map(function(x){return x.n;});
+  var lis=list.filter(function(x){return x.lis;}).map(function(x){return x.n;});
+  if(names.length<2){toast('募集メンバーがいません');return;}
+  var base=(S.proxy||'https://wild-bread-33c3.gantz8811.workers.dev').replace(/\/$/,'');
+  toast('募集メンバーで計算中…');
+  fetch(base+'/plan?names='+encodeURIComponent(names.join('|'))+'&lis='+encodeURIComponent(lis.join('|')),{cache:'no-store'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.players){toast('計算できませんでした');return;}
+      S.players=j.players.map(function(p){return {name:p.name,exp:p.exp,fix:'なし',lis:p.lis};});
+      S.playersAt=Date.now();
+      if(!j.best){ S.teams=null; toast(j.note||'偶数人ではありません'); render(); return; }
+      S.teams={A:j.best.red,B:j.best.blue,sa:j.best.redTotal,sb:j.best.blueTotal,diff:j.best.diff,at:Date.now()};
+      render();
+      toast('募集の'+j.players.length+'人で振り分けました');
+    })
+    .catch(function(e){toast('通信失敗: '+e.message);});
+}
 function renderAlloc(){
   var ps=S.players, t=S.teams;
   var html='';
@@ -753,6 +775,7 @@ function renderAlloc(){
       }).join('')+'</div>';
       html+='<button class="btn primary" data-act="alloc">振り分ける</button>';
     }
+    if(S.rlog&&S.rlog.length) html+='<button class="mini" data-act="planFromRecruit">募集メンバー('+S.rlog.filter(function(x){return !x.quit;}).length+'人)で振り分け</button>';
     html+='<button class="mini" data-act="expFetch"'+(S.expBusy?' disabled':'')+'>'+
           (S.expBusy?'Experience取得中…':'Experienceを更新（Web取得）')+'</button>';
     if(S.expLog&&S.expLog.length) html+='<p class="sub" style="font-family:var(--mono);font-size:10.5px;line-height:1.7">'+esc(S.expLog.join(' / '))+'</p>';
@@ -895,6 +918,7 @@ document.addEventListener('click',function(ev){
   }
   if(act==='fetchSheet'){fetchSheet();return;}
   if(act==='alloc'){allocate();return;}
+  if(act==='planFromRecruit'){planFromRecruit();return;}
   if(act==='expFetch'){expFetchAll();return;}
   if(act==='copyTeams'){
     if(!S.teams){toast('先に振り分けてください');return;}
@@ -1013,6 +1037,5 @@ if(DEMO){
 }
 })();
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
