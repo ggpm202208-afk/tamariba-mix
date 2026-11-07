@@ -128,6 +128,8 @@ input:focus,button:focus-visible{outline:2px solid var(--amber);outline-offset:2
 .team-sum{font-family:var(--mono);font-size:17px;font-weight:600}
 .team.red .team-sum{color:var(--red-soft)}
 .team.blue .team-sum{color:var(--blue-soft)}
+.prow.tappable{cursor:pointer;user-select:none}
+.prow.tappable:active{opacity:.55}
 .prow{display:flex;justify-content:space-between;font-size:13px;color:#C4CABE;gap:8px}
 .prow b{font-family:var(--mono);font-size:11.5px;color:var(--dim);font-weight:600}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:var(--bone);color:#0A0C0A;font-size:12.5px;font-weight:700;padding:11px 16px;border-radius:2px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20;max-width:90vw;text-align:center}
@@ -769,6 +771,9 @@ function renderAlloc(){
       html+='<div class="strip"><span>経験値差</span><span class="n">'+t.diff.toFixed(2)+'</span></div>';
       html+='<button class="btn primary" data-act="alloc">引き直す</button>';
       html+='<button class="mini" data-act="copyTeams">この組み分けをコピー</button>';
+      html+='<button class="mini" data-act="postTeams">この組み分けで決定（Discordに投稿）</button>';
+      html+='<button class="mini" data-act="resetTeams">手動の変更をリセット</button>';
+      html+='<p class="hint" style="margin:0">名前をタップすると赤↔青に移動できます（手動で自由に組めます）</p>';
     }else{
       html+='<div class="roster">'+ps.map(function(p){
         return '<span class="chip">'+esc(p.name)+' <b style="color:#8C948A;font-weight:600">'+p.exp.toFixed(2)+'</b></span>';
@@ -804,10 +809,42 @@ function ageText(ts){
   return Math.floor(s/3600)+'時間前';
 }
 function teamHTML(label,team,sum,cls){
+  var side=cls==='blue'?'B':'A';
   return '<div class="team '+cls+'">'+
     '<div class="team-head"><span class="mono">TEAM '+label+'</span><span class="team-sum">'+sum.toFixed(2)+'</span></div>'+
-    team.map(function(p){return '<div class="prow"><span>'+esc(p.name)+'</span><b>'+p.exp.toFixed(2)+'</b></div>';}).join('')+
+    team.map(function(p,i){return '<div class="prow tappable" data-act="moveP" data-t="'+side+'" data-i="'+i+'"><span>'+esc(p.name)+(p.lis?' 🎧':'')+'</span><b>'+p.exp.toFixed(2)+'</b></div>';}).join('')+
   '</div>';
+}
+/* 手動で振り分けを組み替える */
+function movePlayer(from,idx){
+  if(!S.teams)return;
+  var src=from==='A'?S.teams.A:S.teams.B;
+  var dst=from==='A'?S.teams.B:S.teams.A;
+  if(!src[idx])return;
+  dst.push(src.splice(idx,1)[0]);
+  recalcTeams();
+  render();
+}
+function recalcTeams(){
+  if(!S.teams)return;
+  var f=function(a){return a.reduce(function(x,p){return x+p.exp;},0);};
+  S.teams.sa=f(S.teams.A);S.teams.sb=f(S.teams.B);
+  S.teams.diff=Math.abs(S.teams.sa-S.teams.sb);
+  S.teams.manual=true;
+}
+/* 手で組んだ内容をDiscordへ投稿 */
+function postTeams(){
+  if(!S.teams){toast('先に振り分けてください');return;}
+  if(S.teams.A.length!==S.teams.B.length){toast('人数が揃っていません（'+S.teams.A.length+' vs '+S.teams.B.length+'）');return;}
+  var base=(S.proxy||'https://wild-bread-33c3.gantz8811.workers.dev').replace(/\/$/,'');
+  toast('Discordに投稿中…');
+  fetch(base+'/post-teams?key='+encodeURIComponent(S.setupKey||''), {method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({red:S.teams.A.map(function(p){return {name:p.name,exp:p.exp,lis:!!p.lis};}),
+                         blue:S.teams.B.map(function(p){return {name:p.name,exp:p.exp,lis:!!p.lis};}),
+                         manual:true})})
+    .then(function(r){return r.json();})
+    .then(function(j){ toast(j&&j.ok?'Discordに投稿しました':('失敗: '+((j&&j.error)||'不明'))); })
+    .catch(function(e){toast('通信失敗: '+e.message);});
 }
 
 /* ================= Discord ウェブフック ================= */
@@ -894,7 +931,10 @@ document.addEventListener('click',function(ev){
   if(act==='mode'){
     S.mode=t.getAttribute('data-m')||'recruit';
     saveLS('mixvote.mode',S.mode);
-    if(S.mode==='alloc'&&!S.players.length)setTimeout(fetchSheet,60);
+    if(S.mode==='alloc'){
+      // 開いた瞬間に最新を取る（5分以内に取っていればスキップ）
+      if(!S.players.length||Date.now()-(S.playersAt||0)>300000)setTimeout(fetchSheet,60);
+    }
     render();return;
   }
   if(act==='nameSave'){
@@ -919,6 +959,9 @@ document.addEventListener('click',function(ev){
   if(act==='fetchSheet'){fetchSheet();return;}
   if(act==='alloc'){allocate();return;}
   if(act==='planFromRecruit'){planFromRecruit();return;}
+  if(act==='moveP'){movePlayer(t.getAttribute('data-t'),parseInt(t.getAttribute('data-i'),10)||0);return;}
+  if(act==='postTeams'){postTeams();return;}
+  if(act==='resetTeams'){S.teams=null;render();return;}
   if(act==='expFetch'){expFetchAll();return;}
   if(act==='copyTeams'){
     if(!S.teams){toast('先に振り分けてください');return;}
@@ -1037,5 +1080,6 @@ if(DEMO){
 }
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
