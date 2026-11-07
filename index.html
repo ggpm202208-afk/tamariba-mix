@@ -588,7 +588,7 @@ function csvRows(text){
   return rows;
 }
 function parsePlayers(text){
-  var rows=csvRows(text),out=[],i,j,hdr=-1;
+  var rows=csvRows(text),out=[],i,hdr=-1;
   for(i=0;i<rows.length;i++){
     if((rows[i][1]||'').indexOf('プレイヤー名')>=0){hdr=i;break;}
   }
@@ -596,15 +596,53 @@ function parsePlayers(text){
   for(i=hdr+1;i<rows.length;i++){
     var r=rows[i];
     if(!r||!r[1]||!r[1].trim())continue;
-    var exp=parseFloat(String(r[2]||'').replace(/[^0-9.\-]/g,''));
+    var name=r[1].trim().slice(0,16);
+    var c=String(r[2]||'').trim(), d=String(r[3]||'').trim(), e=String(r[4]||'').trim();
+    var exp, alias, fix;
+    if(c.indexOf('mgo2pc.com')>=0){
+      // プレイヤーDB: B=名前 / C=URL / D=Experience / E=Discord名 / F=固定チーム
+      exp=parseFloat(d.replace(/[^0-9.\-]/g,''));
+      alias=e; fix=String(r[5]||'').trim();
+    }else{
+      // 旧レイアウト: B=名前 / C=Experience / D=固定チーム
+      exp=parseFloat(c.replace(/[^0-9.\-]/g,''));
+      alias=''; fix=d;
+    }
     if(isNaN(exp))continue;
-    out.push({name:r[1].trim().slice(0,16),exp:exp,fix:(r[3]||'なし').trim()});
+    out.push({name:name,exp:exp,fix:(fix||'なし'),
+      alias:String(alias||'').split(/[,、|\/]+/).map(function(x){return x.trim();}).filter(Boolean)});
   }
   return out;
 }
+function nk(v){return String(v||'').toLowerCase().replace(/[\s　_\-・.]/g,'');}
+function poolKeys(p){return [p.name].concat(p.alias||[]).map(nk).filter(Boolean);}
+
+/* DB全員＋募集メンバーを1つのプールにまとめる */
+function rebuildPool(){
+  var prev={};
+  (S.players||[]).forEach(function(q){prev[nk(q.name)]=q.on;});
+  var byKey={};
+  (S.players||[]).forEach(function(q){poolKeys(q).forEach(function(k){if(!byKey[k])byKey[k]=q;});});
+  (S.players||[]).forEach(function(q){q.part=false;q.on=false;});
+  (S.rlog||[]).forEach(function(x){
+    if(x.quit||!x.n)return;
+    var hit=byKey[nk(x.n)];
+    if(hit){hit.part=true;hit.on=true;if(x.lis)hit.lis=true;}
+    else{
+      var np={name:x.n,exp:0,fix:'なし',alias:[],part:true,on:true,lis:!!x.lis,unregistered:true};
+      S.players.push(np);
+      nk(x.n)&&(byKey[nk(x.n)]=np);
+    }
+  });
+  (S.players||[]).forEach(function(q){
+    if(prev[nk(q.name)]===true&&!q.part)q.on=true;   // 手動で選んでいた人は維持
+  });
+}
+function pickedPlayers(){return (S.players||[]).filter(function(p){return p.on;});}
 function sheetURL(){
+  // プレイヤーDB（19人の名簿）を読む。gid ではなくシート名で指定する。
   return 'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(S.sheetId)+
-         '/export?format=csv&gid='+encodeURIComponent(S.gid);
+         '/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent('プレイヤーDB');
 }
 function fetchSheet(){
   if(!S.sheetId){toast('シートIDが空です');return;}
@@ -614,7 +652,7 @@ function fetchSheet(){
     .then(function(t){
       var ps=parsePlayers(t);
       if(!ps.length){toast('プレイヤー行が見つかりません。シートの共有設定を確認してください');return;}
-      S.players=ps;S.playersAt=Date.now();S.teams=null;
+      S.players=ps;S.playersAt=Date.now();S.teams=null;rebuildPool();
       saveLS('mixvote.players',JSON.stringify(ps));
       saveLS('mixvote.playersAt',String(S.playersAt));
       toast(ps.length+'人を読み込みました');render();
@@ -628,8 +666,17 @@ function fixSide(f){
   return null;
 }
 function allocate(){
-  var ps=S.players.slice();
-  if(ps.length<2){toast('プレイヤーが足りません');return;}
+  var all=pickedPlayers().slice();
+  if(all.length<2){toast('選んだ人が足りません（2人以上）');return;}
+  var bench=null;
+  if(all.length%2===1){
+    // 余り1人は補欠。参加者より「DBから追加した人」を優先して外す
+    var cands=all.filter(function(p){return !p.part;});
+    bench=(cands.length?cands[cands.length-1]:all[all.length-1]);
+    all=all.filter(function(p){return p!==bench;});
+  }
+  var ps=all;
+  S.bench=bench;
   var n=ps.length, half=Math.floor(n/2);
   if(n>16){ toast('16人まで対応しています'); return; }
   var fixedA=[],fixedB=[],rest=[];
@@ -745,8 +792,14 @@ function planFromRecruit(){
     .then(function(r){return r.json();})
     .then(function(j){
       if(!j||!j.players){toast('計算できませんでした');return;}
-      S.players=j.players.map(function(p){return {name:p.name,exp:p.exp,fix:'なし',lis:p.lis};});
-      S.playersAt=Date.now();
+      var byN={};(S.players||[]).forEach(function(q){byN[nk(q.name)]=q;});
+      S.players=S.players||[];
+      j.players.forEach(function(p){
+        var hit=byN[nk(p.name)];
+        if(hit){hit.exp=p.exp;hit.on=true;hit.part=true;if(p.lis)hit.lis=true;}
+        else S.players.push({name:p.name,exp:p.exp,fix:'なし',lis:p.lis,part:true,on:true});
+      });
+      S.playersAt=Date.now();S.bench=null;rebuildPool();
       if(!j.best){ S.teams=null; toast(j.note||'偶数人ではありません'); render(); return; }
       S.teams={A:j.best.red,B:j.best.blue,sa:j.best.redTotal,sb:j.best.blueTotal,diff:j.best.diff,at:Date.now()};
       render();
@@ -764,21 +817,31 @@ function renderAlloc(){
       '<p class="sub">スプレッドシートを「リンクを知っている全員が閲覧可」にして、下の設定にIDを入れて読み込んでください。</p>'+
       '<button class="btn primary" data-act="fetchSheet">シートを読み込む</button>';
   }else{
-    html+='<div class="q sub-q"><small>'+ps.length+'人 / 最終取得 '+ageText(S.playersAt)+'</small>'+
+    var pk=pickedPlayers();
+    html+='<div class="q sub-q"><small>選んだ '+pk.length+'人 / DB '+ps.length+'人 / 最終取得 '+ageText(S.playersAt)+'</small>'+
           (t?'この組み分けでいく？':'振り分ける')+'</div>';
     if(t){
       html+=teamHTML('A',t.A,t.sa,'red')+teamHTML('B',t.B,t.sb,'blue');
       html+='<div class="strip"><span>経験値差</span><span class="n">'+t.diff.toFixed(2)+'</span></div>';
+      if(S.bench) html+='<p class="sub" style="margin:0">⏳ 補欠: <b>'+esc(S.bench.name)+'</b>（人数が奇数なので1人余ります）</p>';
       html+='<button class="btn primary" data-act="alloc">引き直す</button>';
       html+='<button class="mini" data-act="copyTeams">この組み分けをコピー</button>';
       html+='<button class="mini" data-act="postTeams">この組み分けで決定（Discordに投稿）</button>';
       html+='<button class="mini" data-act="resetTeams">手動の変更をリセット</button>';
       html+='<p class="hint" style="margin:0">名前をタップすると赤↔青に移動できます（手動で自由に組めます）</p>';
     }else{
-      html+='<div class="roster">'+ps.map(function(p){
-        return '<span class="chip">'+esc(p.name)+' <b style="color:#8C948A;font-weight:600">'+p.exp.toFixed(2)+'</b></span>';
-      }).join('')+'</div>';
-      html+='<button class="btn primary" data-act="alloc">振り分ける</button>';
+      var part=ps.filter(function(p){return p.part;});
+      var other=ps.filter(function(p){return !p.part;});
+      function chip(p){
+        return '<span class="chip'+(p.on?' on':'')+'" data-act="toggleP" data-n="'+esc(p.name)+'" style="cursor:pointer;'+
+          (p.on?'':'opacity:.45;')+'">'+
+          (p.lis?'🎧 ':'')+esc(p.name)+' <b style="color:#8C948A;font-weight:600">'+p.exp.toFixed(2)+'</b></span>';
+      }
+      html+='<div class="lbl" style="margin-top:2px">参加表明（Discord）</div>';
+      html+='<div class="roster">'+(part.length?part.map(chip).join(''):'<span class="sub">まだ誰もいません</span>')+'</div>';
+      html+='<div class="lbl" style="margin-top:8px">DBから追加（タップで選択）</div>';
+      html+='<div class="roster">'+(other.length?other.map(chip).join(''):'<span class="sub">DBに他の人がいません</span>')+'</div>';
+      html+='<button class="btn primary" data-act="alloc">選んだ'+pk.length+'人で振り分ける</button>';
     }
     if(S.rlog&&S.rlog.length) html+='<button class="mini" data-act="planFromRecruit">募集メンバー('+S.rlog.filter(function(x){return !x.quit;}).length+'人)で振り分け</button>';
     html+='<button class="mini" data-act="expFetch"'+(S.expBusy?' disabled':'')+'>'+
@@ -959,6 +1022,11 @@ document.addEventListener('click',function(ev){
   if(act==='fetchSheet'){fetchSheet();return;}
   if(act==='alloc'){allocate();return;}
   if(act==='planFromRecruit'){planFromRecruit();return;}
+  if(act==='toggleP'){
+    var nm=t.getAttribute('data-n');
+    (S.players||[]).forEach(function(p){if(p.name===nm)p.on=!p.on;});
+    S.teams=null;S.bench=null;render();return;
+  }
   if(act==='moveP'){movePlayer(t.getAttribute('data-t'),parseInt(t.getAttribute('data-i'),10)||0);return;}
   if(act==='postTeams'){postTeams();return;}
   if(act==='resetTeams'){S.teams=null;render();return;}
