@@ -405,8 +405,13 @@ function onMsg(m,relayTs){
     var nm=function(x){ return (x&&typeof x==='object') ? String(x.n||x.name||'?') : String(x==null?'?':x); };
     var af=function(x){ return (x&&typeof x==='object'&&x.a) ? x.a : (avm[nm(x)]||null); };
     var lset={}; (m.lis||[]).forEach(function(x){ lset[nm(x)]=1; });
-    var cc=(m.members||[]).map(function(x,i){return {cid:'dc'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec(),lis:!!lset[nm(x)]};});
-    var tt=(m.tent||[]).map(function(x,i){return {cid:'dt'+i,n:nm(x).slice(0,24),av:af(x),ts:nowSec(),tent:true};});
+    var seen={};
+    var cc=(m.members||[]).map(function(x,i){ var k=nm(x); seen[k]=1; return {cid:'dc'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),lis:!!lset[k]};});
+    // 聞き専(🎧)は members/tent に入らないので、ここで足す（Web側だけ欠けていた）
+    (m.lis||[]).forEach(function(x,i){ var k=nm(x); if(seen[k])return; seen[k]=1;
+      cc.push({cid:'dl'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),lis:true}); });
+    var tt=(m.tent||[]).map(function(x,i){ var k=nm(x); if(seen[k])return null; seen[k]=1;
+      return {cid:'dt'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),tent:true};}).filter(Boolean);
     S.rlog=cc.concat(tt);   // Discord分のみ。Web参加(rlogWeb)は別管理なので消えない
     S.dcCount=m.count||0;
     if(S.cap)S.cap=m.cap||S.cap;
