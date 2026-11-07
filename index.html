@@ -410,6 +410,7 @@ function onMsg(m,relayTs){
     S.rlog=cc.concat(tt);   // Discord分のみ。Web参加(rlogWeb)は別管理なので消えない
     S.dcCount=m.count||0;
     if(S.cap)S.cap=m.cap||S.cap;
+    if(S.players&&S.players.length)rebuildPool();
     refreshRecruit();return;
   }
   if(m.t==='alloc'){
@@ -626,7 +627,18 @@ function rebuildPool(){
   (S.players||[]).forEach(function(q){q.part=false;q.on=false;});
   (S.rlog||[]).forEach(function(x){
     if(x.quit||!x.n)return;
-    var hit=byKey[nk(x.n)];
+    var k0=nk(x.n);
+    var hit=byKey[k0];
+    if(!hit){
+      // 部分一致でも拾う（「レイザー（本物）」→「レイザー」など）
+      var cands=[];
+      (S.players||[]).forEach(function(q){
+        poolKeys(q).forEach(function(k){
+          if(k&&(k0.indexOf(k)>=0||k.indexOf(k0)>=0))cands.push(q);
+        });
+      });
+      if(cands.length===1)hit=cands[0];
+    }
     if(hit){hit.part=true;hit.on=true;if(x.lis)hit.lis=true;}
     else{
       var np={name:x.n,exp:0,fix:'なし',alias:[],part:true,on:true,lis:!!x.lis,unregistered:true};
@@ -808,6 +820,7 @@ function planFromRecruit(){
     .catch(function(e){toast('通信失敗: '+e.message);});
 }
 function renderAlloc(){
+  if(S.players&&S.players.length)rebuildPool();   // 参加表明を毎回プールへ反映
   var ps=S.players, t=S.teams;
   var html='';
   html+='<header class="hud">'+tabsHTML('alloc')+'<span class="hud-name">'+esc(S.channel||'—')+'</span></header>';
@@ -853,7 +866,7 @@ function renderAlloc(){
   html+='<details class="host"><summary><span>設定</span></summary><div class="inner">'+
     '<div class="lbl">スプレッドシートID</div>'+
     '<input id="sidInput" value="'+esc(S.sheetId)+'" spellcheck="false" autocomplete="off">'+
-    '<div class="lbl">シートID（gid）</div>'+
+    '<div class="lbl">シートID（gid・未使用／プレイヤーDBを名前で読みます）</div>'+
     '<input id="gidInput" value="'+esc(S.gid)+'" spellcheck="false" autocomplete="off">'+
     '<button class="mini" data-act="sheetSave">保存して読み込む</button>'+
     '<div class="lbl">取得プロキシURL（ExperienceをWebで取る場合）</div>'+
@@ -1132,7 +1145,7 @@ S.st=playLog([],S.n);
 S.rec=playRecruit([],S.cap);
 S.sheetId=getLS('mixvote.sheet',S.sheetId);
 S.gid=getLS('mixvote.gid',S.gid);
-S.proxy=getLS('mixvote.proxy','');
+S.proxy=getLS('mixvote.proxy','https://wild-bread-33c3.gantz8811.workers.dev')||'https://wild-bread-33c3.gantz8811.workers.dev';
 try{S.players=JSON.parse(getLS('mixvote.players','[]'))||[];S.playersAt=parseInt(getLS('mixvote.playersAt','0'),10)||0;}catch(e){S.players=[];}
 if(DEMO){
   var t0=nowSec();
