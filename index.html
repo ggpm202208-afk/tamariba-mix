@@ -121,6 +121,11 @@ input:focus,button:focus-visible{outline:2px solid var(--amber);outline-offset:2
 .chip{font-size:11.5px;padding:4px 8px;border:1px solid var(--line);background:#141A14;border-radius:2px;color:#B8BDB2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip.mine-name{border-color:#3A5A42;color:#C6E4CD}
 .chip.tent{border-color:#4A4229;color:#D8C48A;background:#1A1710}
+.chip.lis{border-color:#2A4358;color:#9FC6D8;background:#0F161B}
+.chip.tlis{border-color:#5A3A22;color:#E6B98C;background:#1B120C}
+.slot.filled[data-st="tent"]{background:#211C12;border-color:#4A4229;color:#D8C48A}
+.slot.filled[data-st="lis"]{background:#101A20;border-color:#2A4358;color:#9FC6D8}
+.slot.filled[data-st="tlis"]{background:#1B120C;border-color:#5A3A22;color:#E6B98C}
 .team{border:1px solid var(--line);background:linear-gradient(180deg,#171D17,#101510);padding:12px;display:flex;flex-direction:column;gap:5px}
 .team.red{border-left:3px solid var(--red)}
 .team.blue{border-left:3px solid var(--blue)}
@@ -184,6 +189,17 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp
 function pad(n){n=String(n);return n.length<2?'0'+n:n>99?'99':n;}
 function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('on');},2400);}
 function nowSec(){return Date.now()/1000;}
+/* ===== 募集の4状態 =====
+   ok=✅参加 / tent=🟡仮 / lis=🎧聞き専(確定) / tlis=🟠聞き専の仮 */
+var MIX_MARK={ok:'✅',tent:'🟡',lis:'🎧',tlis:'🔕'};
+var MIX_WORD={ok:'参加',tent:'仮予約',lis:'参加（聞き専）',tlis:'仮予約（聞き専）'};
+function mixSt(x){
+  if(!x)return 'ok';
+  if(x.st==='ok'||x.st==='tent'||x.st==='lis'||x.st==='tlis')return x.st;
+  if(x.tent||x.lis)return x.tent?(x.lis?'tlis':'tent'):'lis';   // 旧形式のフォールバック
+  return 'ok';
+}
+function mixMark(x){var s=mixSt(x);return s==='ok'?'':MIX_MARK[s]+' ';}
 function vibrate(ms){try{navigator.vibrate&&navigator.vibrate(ms);}catch(e){}}
 function copy(text,label){
   var done=function(){toast(label||'コピーしました');};
@@ -406,12 +422,27 @@ function onMsg(m,relayTs){
     var af=function(x){ return (x&&typeof x==='object'&&x.a) ? x.a : (avm[nm(x)]||null); };
     var lset={}; (m.lis||[]).forEach(function(x){ lset[nm(x)]=1; });
     var seen={};
-    var cc=(m.members||[]).map(function(x,i){ var k=nm(x); seen[k]=1; return {cid:'dc'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),lis:!!lset[k]};});
-    // 聞き専(🎧)は members/tent に入らないので、ここで足す（Web側だけ欠けていた）
+    var cc=(m.members||[]).map(function(x,i){ var k=nm(x); seen[k]=1;
+      return {cid:'dc'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),lis:!!lset[k],st:(lset[k]?'lis':'ok')};});
+    // 聞き専(🎧)は members/tent に入らないので、ここで足す
     (m.lis||[]).forEach(function(x,i){ var k=nm(x); if(seen[k])return; seen[k]=1;
-      cc.push({cid:'dl'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),lis:true}); });
+      cc.push({cid:'dl'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),lis:true,st:'lis'}); });
     var tt=(m.tent||[]).map(function(x,i){ var k=nm(x); if(seen[k])return null; seen[k]=1;
-      return {cid:'dt'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),tent:true};}).filter(Boolean);
+      return {cid:'dt'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),tent:true,lis:!!lset[k],st:(lset[k]?'tlis':'tent')};}).filter(Boolean);
+    // Worker が lisT を別配列で送ってくる場合（🎧 と 🔕 の区別）
+    if(m.lisT&&m.lisT.length){var lts={};m.lisT.forEach(function(x){lts[nm(x)]=1;});
+      cc.forEach(function(e){if(lts[e.n]){e.st='tlis';e.tent=true;e.lis=true;}});}
+    // 新形式 m.p=[{n,a,s}] が来たら4状態をそのまま採用（古いWorkerでも上の処理で動く）
+    if(m.p&&m.p.length){
+      var pp=[],ps={};
+      m.p.forEach(function(x,i){
+        var k=nm(x); if(ps[k])return; ps[k]=1;
+        var s=(x&&x.s)||'ok'; if(!MIX_MARK[s])s='ok';
+        pp.push({cid:'dp'+i,n:k.slice(0,24),av:af(x),ts:nowSec(),st:s,
+                 tent:(s==='tent'||s==='tlis'),lis:(s==='lis'||s==='tlis')});
+      });
+      cc=pp; tt=[];
+    }
     S.rlog=cc.concat(tt);   // Discord分のみ。Web参加(rlogWeb)は別管理なので消えない
     S.dcCount=m.count||0;
     if(S.cap)S.cap=m.cap||S.cap;
@@ -481,9 +512,13 @@ function playRecruit(log,cap){
       var cur=list[idx[e.cid]];
       cur.n=e.n||cur.n;
       if(e.av)cur.av=e.av;          // アイコンは後から届いた方を優先
+      cur.st=mixSt(e);              // 🟡→✅ などの状態変化を反映
+      cur.tent=(cur.st==='tent'||cur.st==='tlis');
+      cur.lis=(cur.st==='lis'||cur.st==='tlis');
       continue;
     }
-    list.push({cid:e.cid,n:e.n||'?',av:e.av||null,ts:e.ts});
+    list.push({cid:e.cid,n:e.n||'?',av:e.av||null,ts:e.ts,st:mixSt(e),
+               tent:(mixSt(e)==='tent'||mixSt(e)==='tlis'),lis:(mixSt(e)==='lis'||mixSt(e)==='tlis')});
     idx[e.cid]=list.length-1;
   }
   return {list:list,count:list.length,full:list.length>=cap,cap:cap};
@@ -505,7 +540,7 @@ function renderRecruit(){
       var face=p.av
         ? '<img src="'+esc(p.av)+'" alt="" onerror="this.style.display=\'none\'">'
         : '<span>'+esc(ini.toUpperCase())+'</span>';
-      slots+='<div class="slot filled" title="'+esc(p.n)+'">'+face+'<b>'+esc(p.n)+'</b></div>';
+      slots+='<div class="slot filled" title="'+esc(p.n)+'" data-st="'+mixSt(p)+'">'+face+'<b>'+mixMark(p)+esc(p.n)+'</b></div>';
     }else{
       slots+='<div class="slot"></div>';
     }
@@ -534,7 +569,9 @@ function renderRecruit(){
   html+='<div class="roster">'+r.list.map(function(p){
       var me=p.cid===S.cid?' mine-name':'';
       var im=p.av?'<img src="'+esc(p.av)+'" alt="" onerror="this.style.display=\'none\'">':'';
-      return '<span class="chip'+me+(p.tent?' tent':'')+'">'+im+(p.tent?'🟡 ':'')+esc(p.n)+'</span>';
+      var st=mixSt(p);
+      var cls=me+(st==='tent'?' tent':'')+(st==='lis'?' lis':'')+(st==='tlis'?' tlis':'');
+      return '<span class="chip'+cls+'" title="'+MIX_WORD[st]+'">'+im+mixMark(p)+esc(p.n)+'</span>';
     }).join('')+(r.list.length?'':'<span class="hint" style="margin:0">まだ誰もいません</span>')+'</div>';
 
   if(r.full){
@@ -573,7 +610,7 @@ function rlogAll(){
 }
 function refreshRecruit(){
   var r=playRecruit(rlogAll(),S.cap||12);
-  var key=[r.count,r.full,JSON.stringify(r.list.map(function(p){return p.n;}))].join('|');
+  var key=[r.count,r.full,JSON.stringify(r.list.map(function(p){return p.n+':'+mixSt(p);}))].join('|');
   if(key!==rLastKey){rLastKey=key;render();}
 }
 
@@ -1167,6 +1204,7 @@ if(DEMO){
 }
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
